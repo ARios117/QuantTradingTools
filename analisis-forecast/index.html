@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Forecast GARCH + Monte Carlo · Quant Terminal</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <link rel="stylesheet" href="../assets/css/terminal.css" />
+  <script src="../assets/js/market-data.js"></script>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../"><span class="nav-dot"></span>Quant&nbsp;Terminal</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-lbl">Forecast GARCH</span>
+    <span class="nav-clock" id="qtt-clock"><b>UTC</b> <span id="qtt-clock-val">--:--:--</span></span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-scan" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-pill"><span class="hero-pill-dot"></span>Quant Terminal · FORECAST</div>
+    <h1>Forecast con <em>GARCH y Monte Carlo</em></h1>
+    <p class="hero-sub">Proyección de precios a 5 días con volatilidad condicional GARCH(1,1) y bandas de confianza vía simulación Monte Carlo (10 000 trayectorias).</p>
+    <div class="hero-wins">
+      <span class="hero-win"><span class="hero-win-dot"></span>S&amp;P 500</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Nasdaq 100</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>BTC-USD</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Modo Backtest</span>
+    </div>
+  </div>
+</section>
+
+<!-- WAVE hero→tool -->
+
+<!-- TOOL SECTION -->
+<section class="light-sec tool-section" id="tool">
+  <div class="light-inner" style="max-width:none">
+    <div class="tool-header">
+      <span class="light-pill">Herramienta interactiva</span>
+      <h2 class="light-title">Forecast <em>GARCH + Monte Carlo</em></h2>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-grid">
+        <div class="field">
+          <label for="activo">Activo</label>
+          <select id="activo">
+            <option value="^GSPC">S&amp;P 500</option>
+            <option value="^NDX">Nasdaq 100</option>
+            <option value="BTC-USD" selected>BTC</option>
+            <option value="GC=F">Oro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="dias">Días a forecastear</label>
+          <input id="dias" type="number" min="1" max="252" step="1" value="5" />
+        </div>
+        <div class="field">
+          <label for="backtest">Modo</label>
+          <label class="field-check" for="backtest">
+            <input id="backtest" type="checkbox" />
+            <span>Backtest mode</span>
+          </label>
+        </div>
+        <div class="field" id="field-fecha" style="display:none">
+          <label for="end-date">Fecha fin</label>
+          <input id="end-date" type="date" />
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button id="btn-generar" class="btn-primary" type="button">Generar Forecast</button>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-head">
+          <div class="chart-title" id="chart-title">Selecciona un activo y pulsa “Generar Forecast”</div>
+          <div class="chart-meta" id="chart-meta">—</div>
+        </div>
+        <div class="chart-canvas-host">
+          <canvas id="chart"></canvas>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="entropy" id="entropy"></div>
+        <div class="qtable-wrap" id="qtable-wrap"></div>
+        <div class="status" id="status">Listo. Pulsa “Generar Forecast” para comenzar.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WAVE light→info -->
+
+<!-- INFO / DISCLAIMER -->
+<section class="info-band">
+  <div class="info-inner">
+    <span class="info-pill">Aviso importante</span>
+    <h2 class="info-title">No constituye una estrategia<br>de inversión</h2>
+    <div class="info-box">
+      Este programa estima el forecast de precios basado en GARCH y simula trayectorias usando Monte Carlo. La información mostrada es exclusivamente de carácter educativo e informativo.
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-inner">
+    Quant Terminal · FORECAST &nbsp;·&nbsp; Datos: Yahoo Finance &nbsp;·&nbsp;
+    Uso educativo, no es asesoramiento financiero &nbsp;·&nbsp;
+    <a href="../">&#8592; Índice de herramientas</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const ASSETS = { "^GSPC":"S&P 500", "^NDX":"Nasdaq 100", "BTC-USD":"BTC", "GC=F":"Oro" };
+  const N_SIM  = 10000;
+
+  const $ = (id)=>document.getElementById(id);
+  const selActivo = $("activo");
+  const inpDias   = $("dias");
+  const chkBT     = $("backtest");
+  const fldFecha  = $("field-fecha");
+  const inpFecha  = $("end-date");
+  const btnGen    = $("btn-generar");
+  const elTitle   = $("chart-title");
+  const elMeta    = $("chart-meta");
+  const elStatus  = $("status");
+  const elLegend  = $("legend");
+  const elEntropy = $("entropy");
+  const elQTable  = $("qtable-wrap");
+  const canvas    = $("chart");
+
+  inpFecha.value = new Date().toISOString().slice(0,10);
+  chkBT.addEventListener("change", ()=>{ fldFecha.style.display = chkBT.checked ? "" : "none"; });
+
+  let chart = null;
+  let currentAbort = null;
+
+  const setStatus = (m,k)=>{ elStatus.className="status"+(k?" "+k:""); elStatus.textContent=m; };
+  const fmtISO = (d)=>{ const y=d.getFullYear(),m=String(d.getMonth()+1).padStart(2,"0"),da=String(d.getDate()).padStart(2,"0"); return `${y}-${m}-${da}`; };
+  const fmtNum = (v)=> Math.abs(v)>=1000 ? v.toLocaleString("es-ES",{maximumFractionDigits:2}) : v.toLocaleString("es-ES",{maximumFractionDigits:4});
+
+  async function fetchSeries(symbol, startDate, endDate, signal){
+    const series = await QTT.series({
+      symbol, interval: "1d", from: fmtISO(startDate), to: fmtISO(endDate)
+    });
+    if (signal && signal.aborted){
+      const err = new Error("Petición cancelada"); err.name = "AbortError"; throw err;
+    }
+    if (series.length < 50) throw new Error("Serie insuficiente: " + series.length + " cierres (se necesitan 50).");
+    return series;
+  }
+
+  /* ---------- GARCH(1,1) Normal con variance targeting ---------- */
+  function fitGarch(returns){
+    const n = returns.length;
+    let sum=0; for (let i=0;i<n;i++) sum+=returns[i];
+    const mu = sum/n;
+    const r = new Array(n); for (let i=0;i<n;i++) r[i]=returns[i]-mu;
+    let s2=0; for (let i=0;i<n;i++) s2+=r[i]*r[i]; s2/=n;
+
+    function negLL(alpha, beta){
+      if (alpha<0 || beta<0 || alpha+beta>=0.999) return 1e18;
+      const omega = s2*(1 - alpha - beta);
+      if (omega <= 0) return 1e18;
+      let sigma2 = s2, ll = 0;
+      const log2pi = Math.log(2*Math.PI);
+      for (let i=0;i<n;i++){
+        const rr = r[i]*r[i];
+        if (i>0) sigma2 = omega + alpha*r[i-1]*r[i-1] + beta*sigma2;
+        if (sigma2 <= 1e-20) return 1e18;
+        ll += -0.5*(log2pi + Math.log(sigma2) + rr/sigma2);
+      }
+      return -ll;
+    }
+
+    // grid
+    let bestA=0.05, bestB=0.90, bestL = negLL(bestA, bestB);
+    for (let a=0.01; a<=0.30; a+=0.01){
+      for (let b=0.50; b<=0.98; b+=0.01){
+        if (a+b >= 0.999) continue;
+        const v = negLL(a,b);
+        if (v < bestL){ bestL=v; bestA=a; bestB=b; }
+      }
+    }
+    // refine
+    let step = 0.005;
+    for (let it=0; it<40; it++){
+      let improved = false;
+      const cands = [[bestA+step,bestB],[bestA-step,bestB],[bestA,bestB+step],[bestA,bestB-step]];
+      for (const [a,b] of cands){
+        const v = negLL(a,b);
+        if (v < bestL){ bestL=v; bestA=a; bestB=b; improved=true; }
+      }
+      if (!improved) step *= 0.5;
+      if (step < 1e-5) break;
+    }
+    const omega = s2*(1-bestA-bestB);
+
+    // conditional volatilities
+    const sigma2Arr = new Array(n);
+    sigma2Arr[0] = s2;
+    for (let i=1;i<n;i++) sigma2Arr[i] = omega + bestA*r[i-1]*r[i-1] + bestB*sigma2Arr[i-1];
+    const sigmaArr = sigma2Arr.map(Math.sqrt);
+
+    return { mu, omega, alpha:bestA, beta:bestB, sigma2Last: sigma2Arr[n-1], rLast: r[n-1], sigmaArr, residCenter:r };
+  }
+
+  function forecastVariance(g, h){
+    const arr = new Array(h);
+    arr[0] = g.omega + g.alpha*g.rLast*g.rLast + g.beta*g.sigma2Last;
+    for (let i=1;i<h;i++) arr[i] = g.omega + (g.alpha+g.beta)*arr[i-1];
+    return arr;
+  }
+
+  // Box-Muller
+  function randn(){
+    let u=0,v=0;
+    while(u===0) u=Math.random();
+    while(v===0) v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+
+  function monteCarlo(P0, mu, varForecast){
+    const h = varForecast.length;
+    const stds = varForecast.map(Math.sqrt);
+    const pct = [0.05,0.25,0.50,0.75,0.95];
+    const cols = []; for (let t=0;t<h;t++) cols.push(new Float64Array(N_SIM));
+    for (let s=0; s<N_SIM; s++){
+      let price = P0;
+      for (let t=0;t<h;t++){
+        const r = mu + stds[t]*randn();
+        price = price*Math.exp(r);
+        cols[t][s] = price;
+      }
+    }
+    const summary = pct.map(()=>new Array(h));
+    for (let t=0;t<h;t++){
+      const sorted = Array.from(cols[t]).sort((a,b)=>a-b);
+      for (let pi=0; pi<pct.length; pi++){
+        const idx = Math.min(N_SIM-1, Math.floor(pct[pi]*N_SIM));
+        summary[pi][t] = sorted[idx];
+      }
+    }
+    return { pct, summary };
+  }
+
+  function computeEntropy(condVol){
+    const last = condVol.slice(-500);
+    const lo = Math.min.apply(null,last), hi = Math.max.apply(null,last);
+    if (hi <= lo) return 0;
+    const bins = 20;
+    const counts = new Array(bins).fill(0);
+    for (const v of last){
+      let b = Math.floor((v-lo)/(hi-lo)*bins);
+      if (b>=bins) b=bins-1; if (b<0) b=0;
+      counts[b]++;
+    }
+    const total = last.length;
+    let H = 0;
+    for (const c of counts){ if (c>0){ const p=c/total; H -= p*Math.log2(p); } }
+    return H;
+  }
+
+  function entropyState(H){
+    if (H < 1) return { label:`Entropía baja ✅`, cls:"low" };
+    if (H < 3) return { label:`Entropía moderada ⚠`, cls:"med" };
+    return { label:`Entropía crítica ⛔`, cls:"hi" };
+  }
+
+  function addBusinessDays(d, n){
+    const r = new Date(d); let added = 0;
+    while (added < n){
+      r.setDate(r.getDate()+1);
+      const w = r.getDay();
+      if (w !== 0 && w !== 6) added++;
+    }
+    return r;
+  }
+
+  function buildLegend(){
+    elLegend.innerHTML = "";
+    const items = [
+      { color:"#e6ebf2", label:"Histórico (últimos 100 días)" },
+      { color:"#ff3b4e", label:"Mediana (50%)" },
+      { color:"rgba(255,59,78,.35)", label:"Intervalo 50% (25-75)" },
+      { color:"rgba(255,59,78,.18)", label:"Intervalo 90% (5-95)" }
+    ];
+    for (const it of items){
+      const s = document.createElement("span"); s.className="leg";
+      const m = document.createElement("span"); m.className="leg-sw"; m.style.background=it.color;
+      s.appendChild(m); s.appendChild(document.createTextNode(it.label));
+      elLegend.appendChild(s);
+    }
+  }
+
+  function buildTable(pct, summary, dates){
+    // Transpuesta: filas = fechas, columnas = percentiles (95%→5%)
+    const headers = [];
+    for (let i=pct.length-1;i>=0;i--) headers.push(`${Math.round(pct[i]*100)}%`);
+    let html = '<table class="qtable"><thead><tr><th>Fecha</th>';
+    for (const h of headers) html += `<th>${h}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let t=0;t<dates.length;t++){
+      html += `<tr><td>${fmtISO(dates[t])}</td>`;
+      for (let i=pct.length-1;i>=0;i--){
+        html += `<td>${fmtNum(summary[i][t])}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    elQTable.innerHTML = html;
+  }
+
+  async function generar(){
+    const nDays = Math.max(1, Math.min(252, parseInt(inpDias.value, 10) || 5));
+    inpDias.value = nDays;
+
+    const symbol = selActivo.value;
+    const nombre = ASSETS[symbol] || symbol;
+    let endDate = new Date();
+    if (chkBT.checked){
+      if (!inpFecha.value){ setStatus("Selecciona fecha fin para el backtest.","error"); return; }
+      const p = inpFecha.value.split("-").map(Number);
+      endDate = new Date(p[0], p[1]-1, p[2]);
+    }
+    const startDate = new Date(endDate.getTime() - 365*10*86400000);
+
+    if (currentAbort) currentAbort.abort();
+    currentAbort = new AbortController();
+    const signal = currentAbort.signal;
+
+    btnGen.disabled = true;
+    setStatus("Descargando datos de mercado (10 años)…", "loading");
+
+    try {
+      const series = await fetchSeries(symbol, startDate, endDate, signal);
+      if (series.length < 100) throw new Error("Datos insuficientes.");
+
+      setStatus("Ajustando modelo GARCH(1,1)…", "loading");
+      await new Promise(r=>setTimeout(r,15));
+
+      // log returns
+      const prices = series.map(p=>p.y);
+      const times  = series.map(p=>p.t);
+      const returns = new Array(prices.length-1);
+      for (let i=1;i<prices.length;i++) returns[i-1] = Math.log(prices[i]/prices[i-1]);
+
+      const g = fitGarch(returns);
+      const varForecast = forecastVariance(g, nDays);
+
+      setStatus(`Simulando ${N_SIM.toLocaleString("es-ES")} trayectorias Monte Carlo…`, "loading");
+      await new Promise(r=>setTimeout(r,15));
+
+      const P0 = prices[prices.length-1];
+      const mc = monteCarlo(P0, g.mu, varForecast);
+
+      // future business dates
+      const lastDate = new Date(times[times.length-1]);
+      const futureDates = [];
+      let d = new Date(lastDate);
+      for (let i=0;i<nDays;i++){ d = addBusinessDays(d,1); futureDates.push(new Date(d)); }
+
+      // entropy
+      const H = computeEntropy(g.sigmaArr);
+      const st = entropyState(H);
+      elEntropy.className = "entropy show " + st.cls;
+      elEntropy.textContent = `Entropía del mercado (últimos 500 días): ${H.toFixed(4)} bits • ${st.label}`;
+
+      // chart — histórico escalado: misma proporción que forecast (20x)
+      const histN = Math.min(nDays * 20, prices.length);
+      const histStart = prices.length - histN;
+      const histPts = []; for (let i=histStart;i<prices.length;i++) histPts.push({ x: times[i], y: prices[i] });
+      const ftMs = futureDates.map(dd=>dd.getTime());
+      const median = mc.summary[2].map((v,i)=>({ x: ftMs[i], y: v }));
+      const p5  = mc.summary[0], p25 = mc.summary[1], p75 = mc.summary[3], p95 = mc.summary[4];
+      const band90Up = p95.map((v,i)=>({ x: ftMs[i], y: v }));
+      const band90Dn = p5.map((v,i)=>({ x: ftMs[i], y: v }));
+      const band50Up = p75.map((v,i)=>({ x: ftMs[i], y: v }));
+      const band50Dn = p25.map((v,i)=>({ x: ftMs[i], y: v }));
+
+      // connect last historical point to forecast bands
+      const connect = { x: times[times.length-1], y: P0 };
+      const medianFull = [connect, ...median];
+
+      if (chart){ chart.destroy(); chart = null; }
+      const ctx = canvas.getContext("2d");
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          datasets: [
+            // Bands 90%: draw upper line, fill down to lower
+            { label:"p95", data:[connect,...band90Up], borderColor:"rgba(255,59,78,.0)", backgroundColor:"rgba(255,59,78,.10)",
+              fill:"+1", pointRadius:0, borderWidth:0, tension:0, order:6 },
+            { label:"p5",  data:[connect,...band90Dn], borderColor:"rgba(255,59,78,.0)", backgroundColor:"rgba(255,59,78,.10)",
+              fill:false, pointRadius:0, borderWidth:0, tension:0, order:6 },
+            // Bands 50%
+            { label:"p75", data:[connect,...band50Up], borderColor:"rgba(255,59,78,.0)", backgroundColor:"rgba(255,59,78,.22)",
+              fill:"+1", pointRadius:0, borderWidth:0, tension:0, order:5 },
+            { label:"p25", data:[connect,...band50Dn], borderColor:"rgba(255,59,78,.0)", backgroundColor:"rgba(255,59,78,.22)",
+              fill:false, pointRadius:0, borderWidth:0, tension:0, order:5 },
+            // Historical
+            { label:"Histórico", data: histPts, borderColor:"#e6ebf2", backgroundColor:"#e6ebf2",
+              borderWidth:1.6, pointRadius:0, tension:0, order:2 },
+            // Median
+            { label:"Mediana (50%)", data: medianFull, borderColor:"#ff3b4e", backgroundColor:"#ff3b4e",
+              borderWidth:1.8, pointRadius:0, tension:0, order:1 }
+          ]
+        },
+        options: {
+          responsive:true, maintainAspectRatio:false,
+          interaction:{ intersect:false, mode:"nearest", axis:"x" },
+          plugins: {
+            legend:{ display:false },
+            tooltip:{
+              backgroundColor:"rgba(6,8,11,.96)", borderColor:"rgba(0,229,138,.30)", borderWidth:1,
+              titleColor:"#e6ebf2", bodyColor:"#e6ebf2",
+              filter:(c)=> !["p5","p25","p75","p95"].includes(c.dataset.label),
+              callbacks:{ label:(c)=>`${c.dataset.label}: ${fmtNum(c.parsed.y)}` }
+            }
+          },
+          scales:{
+            x:{ type:"time", time:{ unit:"week" },
+                ticks:{ color:"rgba(230,235,242,.45)", maxRotation:0, autoSkip:true, maxTicksLimit:8 },
+                grid:{ color:"rgba(255,255,255,.05)" } },
+            y:{ ticks:{ color:"rgba(230,235,242,.45)", callback:(v)=>fmtNum(v) },
+                grid:{ color:"rgba(255,255,255,.05)" } }
+          }
+        }
+      });
+
+      elTitle.textContent = `${nombre} — Forecast ${nDays} día${nDays !== 1 ? "s" : ""}`;
+      elMeta.textContent  = `α=${g.alpha.toFixed(3)} · β=${g.beta.toFixed(3)} · ω=${g.omega.toExponential(2)} · μ=${(g.mu*100).toFixed(3)}% · historial mostrado: ${histN} días`;
+      buildLegend();
+      buildTable(mc.pct, mc.summary, futureDates);
+      setStatus(`Listo. ${prices.length} obs. totales · ${histN} días en gráfico · ${N_SIM.toLocaleString("es-ES")} simulaciones Monte Carlo.`);
+    } catch (err){
+      if (err.name === "AbortError") return;
+      console.error(err);
+      setStatus("Error al generar el forecast: " + (err && err.message ? err.message : err), "error");
+    } finally {
+      btnGen.disabled = false;
+    }
+  }
+
+  btnGen.addEventListener("click", generar);
+  [selActivo, inpFecha].forEach(el=>{
+    el.addEventListener("keydown", (e)=>{ if (e.key === "Enter") generar(); });
+  });
+})();
+</script>
+<script>
+/* UTC session clock in the nav bar */
+(function(){
+  var out = document.getElementById("qtt-clock-val");
+  if (!out) return;
+  function tick(){
+    out.textContent = new Date().toISOString().slice(11, 19);
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+
+</body>
+</html>

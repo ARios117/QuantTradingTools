@@ -1,0 +1,410 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Geometría Fractal · Quant Terminal</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+  <link rel="stylesheet" href="../assets/css/terminal.css" />
+  <script src="../assets/js/market-data.js"></script>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../"><span class="nav-dot"></span>Quant&nbsp;Terminal</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-lbl">Geometría Fractal</span>
+    <span class="nav-clock" id="qtt-clock"><b>UTC</b> <span id="qtt-clock-val">--:--:--</span></span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-scan" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-pill"><span class="hero-pill-dot"></span>Quant Terminal · FRACTAL</div>
+    <h1>Anomalías sobre <em>regresión lineal</em></h1>
+    <p class="hero-sub">Detecta desviaciones estadísticas relevantes en S&amp;P 500, Nasdaq 100 y BTC respecto a su tendencia, con bandas ±1σ y ±2σ.</p>
+    <div class="hero-wins">
+      <span class="hero-win"><span class="hero-win-dot"></span>S&amp;P 500</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Nasdaq 100</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>BTC-USD</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Modo Backtest</span>
+    </div>
+  </div>
+</section>
+
+<!-- WAVE hero→tool -->
+
+<!-- TOOL SECTION -->
+<section class="light-sec tool-section" id="tool">
+  <div class="light-inner" style="max-width:none">
+    <div class="tool-header">
+      <span class="light-pill">Herramienta interactiva</span>
+      <h2 class="light-title">Análisis de <em>regresión lineal</em></h2>
+    </div>
+
+    <div class="tool-card">
+      <div class="tool-grid">
+        <div class="field">
+          <label for="activo">Activo</label>
+          <select id="activo">
+            <option value="^GSPC">S&amp;P 500</option>
+            <option value="^NDX">Nasdaq 100</option>
+            <option value="BTC-USD" selected>BTC</option>
+            <option value="GC=F">Oro</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="meses">Meses de historial</label>
+          <input id="meses" type="number" min="1" max="600" step="1" value="12" />
+        </div>
+        <div class="field">
+          <label for="backtest">Modo</label>
+          <label class="field-check" for="backtest">
+            <input id="backtest" type="checkbox" />
+            <span>Backtest mode</span>
+          </label>
+        </div>
+        <div class="field" id="field-fecha" style="display:none">
+          <label for="end-date">Fecha fin</label>
+          <input id="end-date" type="date" />
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button id="btn-generar" class="btn-primary" type="button">Generar gráfico</button>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-head">
+          <div class="chart-title" id="chart-title">Selecciona un activo y pulsa "Generar gráfico"</div>
+          <div class="chart-meta" id="chart-meta">—</div>
+        </div>
+        <div class="chart-canvas-host">
+          <canvas id="chart"></canvas>
+        </div>
+        <div class="legend" id="legend"></div>
+        <div class="status" id="status">Listo. Pulsa "Generar gráfico" para comenzar.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WAVE light→info -->
+
+<!-- INFO / DISCLAIMER -->
+<section class="info-band">
+  <div class="info-inner">
+    <span class="info-pill">Aviso importante</span>
+    <h2 class="info-title">No constituye una estrategia<br>de inversión</h2>
+    <div class="info-box">
+      Este programa analiza anomalías estadísticas en base a la regresión lineal de activos bursátiles. La información mostrada es exclusivamente de carácter educativo e informativo.
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-inner">
+    Quant Terminal · FRACTAL &nbsp;·&nbsp; Datos: Yahoo Finance &nbsp;·&nbsp;
+    Uso educativo, no es asesoramiento financiero &nbsp;·&nbsp;
+    <a href="../">&#8592; Índice de herramientas</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  const ASSETS = {
+    "^GSPC": "S&P 500",
+    "^NDX":  "Nasdaq 100",
+    "BTC-USD": "BTC",
+    "GC=F": "Oro"
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const selActivo = $("activo");
+  const inpMeses  = $("meses");
+  const chkBT     = $("backtest");
+  const fldFecha  = $("field-fecha");
+  const inpFecha  = $("end-date");
+  const btnGen    = $("btn-generar");
+  const elTitle   = $("chart-title");
+  const elMeta    = $("chart-meta");
+  const elStatus  = $("status");
+  const elLegend  = $("legend");
+  const canvas    = $("chart");
+
+  // Default fecha fin = hoy
+  const today = new Date();
+  inpFecha.value = today.toISOString().slice(0,10);
+
+  // Default: BTC con 6 meses
+  if (selActivo.value === "BTC-USD") inpMeses.value = "6";
+
+  selActivo.addEventListener("change", () => {
+    if (selActivo.value === "BTC-USD") inpMeses.value = "6";
+    else if (inpMeses.value === "6") inpMeses.value = "12";
+  });
+
+  chkBT.addEventListener("change", () => {
+    fldFecha.style.display = chkBT.checked ? "" : "none";
+  });
+
+  let chart = null;
+
+  function setStatus(msg, kind){
+    elStatus.className = "status" + (kind ? " " + kind : "");
+    elStatus.textContent = msg;
+  }
+
+  function linearRegression(x, y){
+    const n = x.length;
+    let sx=0, sy=0;
+    for (let i=0;i<n;i++){ sx+=x[i]; sy+=y[i]; }
+    const mx = sx/n, my = sy/n;
+    let num=0, den=0;
+    for (let i=0;i<n;i++){
+      const dx = x[i]-mx;
+      num += dx*(y[i]-my);
+      den += dx*dx;
+    }
+    const slope = den === 0 ? 0 : num/den;
+    const intercept = my - slope*mx;
+    const trend = new Array(n);
+    for (let i=0;i<n;i++) trend[i] = slope*x[i] + intercept;
+    return { trend, slope };
+  }
+
+  function stdev(arr){
+    const n = arr.length;
+    let s=0; for (let i=0;i<n;i++) s+=arr[i];
+    const m = s/n;
+    let v=0; for (let i=0;i<n;i++){ const d=arr[i]-m; v += d*d; }
+    return Math.sqrt(v/n);
+  }
+
+  function fmtISO(d){
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    const day = String(d.getDate()).padStart(2,"0");
+    return `${y}-${m}-${day}`;
+  }
+
+  async function fetchSeries(symbol, startDate, endDate){
+    return QTT.series({
+      symbol, interval: "1d", from: fmtISO(startDate), to: fmtISO(endDate)
+    });
+  }
+
+  function buildLegend(){
+    elLegend.innerHTML = "";
+    const items = [
+      { sw: true, color: "#e6ebf2", label: "Precio" },
+      { sw: true, color: "#ffb020", label: "Tendencia (regresión lineal)" },
+      { sw: true, color: "#00e58a", label: "+1σ", dash: true },
+      { sw: true, color: "#ff3b4e", label: "-1σ", dash: true },
+      { sw: true, color: "#c084fc", label: "+2σ", dash: true },
+      { sw: true, color: "#ffb020", label: "-2σ", dash: true },
+      { dot: true, color: "#35c7f0", label: "Anomalía > +1σ" },
+      { dot: true, color: "#fb923c", label: "Anomalía < -1σ" }
+    ];
+    for (const it of items){
+      const s = document.createElement("span");
+      s.className = "leg";
+      const m = document.createElement("span");
+      if (it.dot){ m.className = "leg-dot"; m.style.background = it.color; }
+      else {
+        m.className = "leg-sw";
+        m.style.background = it.dash
+          ? `repeating-linear-gradient(90deg, ${it.color} 0 4px, transparent 4px 7px)`
+          : it.color;
+      }
+      s.appendChild(m);
+      s.appendChild(document.createTextNode(it.label));
+      elLegend.appendChild(s);
+    }
+  }
+
+  function fmtNum(v){
+    if (Math.abs(v) >= 1000) return v.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+    return v.toLocaleString("es-ES", { maximumFractionDigits: 4 });
+  }
+
+  async function generar(){
+    let meses = parseInt(inpMeses.value, 10);
+    if (!Number.isFinite(meses) || meses <= 0){
+      setStatus("Por favor, ingrese un número entero positivo para los meses.", "error");
+      return;
+    }
+    const symbol = selActivo.value;
+    const nombre = ASSETS[symbol] || symbol;
+
+    let endDate = new Date();
+    if (chkBT.checked){
+      if (!inpFecha.value){
+        setStatus("Selecciona una fecha de fin para el backtest.", "error");
+        return;
+      }
+      const parts = inpFecha.value.split("-").map(Number);
+      endDate = new Date(parts[0], parts[1]-1, parts[2]);
+    }
+    const startDate = new Date(endDate.getTime() - meses * 30 * 86400000);
+
+    btnGen.disabled = true;
+    setStatus("Descargando datos de mercado…", "loading");
+
+    try {
+      const series = await fetchSeries(symbol, startDate, endDate);
+      if (series.length < 5) throw new Error("Datos insuficientes para el cálculo.");
+
+      const t0 = series[0].t;
+      const x = series.map(p => (p.t - t0) / 86400000);
+      const y = series.map(p => p.y);
+
+      const { trend, slope } = linearRegression(x, y);
+      const residuals = y.map((v,i) => v - trend[i]);
+      const sd = stdev(residuals);
+
+      const plus1  = trend.map(v => v + sd);
+      const minus1 = trend.map(v => v - sd);
+      const plus2  = trend.map(v => v + 2*sd);
+      const minus2 = trend.map(v => v - 2*sd);
+
+      const anomHigh = [];
+      const anomLow  = [];
+      for (let i=0;i<y.length;i++){
+        if (y[i] > plus1[i])  anomHigh.push({ x: series[i].t, y: y[i] });
+        if (y[i] < minus1[i]) anomLow.push({  x: series[i].t, y: y[i] });
+      }
+
+      const toPts = (arr) => arr.map((v,i) => ({ x: series[i].t, y: v }));
+
+      if (chart) { chart.destroy(); chart = null; }
+
+      // Posiciona el tooltip siempre en la esquina superior izquierda del área del gráfico
+      Chart.Tooltip.positioners.topLeft = function(elements, eventPosition) {
+        const chartArea = this.chart.chartArea;
+        return { x: chartArea.left + 10, y: chartArea.top + 6 };
+      };
+
+      const ctx = canvas.getContext("2d");
+      chart = new Chart(ctx, {
+        type: "line",
+        data: {
+          datasets: [
+            { label: "Precio", data: toPts(y),
+              borderColor: "#e6ebf2", backgroundColor: "#e6ebf2",
+              borderWidth: 1.6, pointRadius: 0, tension: 0, order: 5 },
+            { label: "Tendencia", data: toPts(trend),
+              borderColor: "#ffb020", backgroundColor: "#ffb020",
+              borderWidth: 2, pointRadius: 0, tension: 0, order: 4 },
+            { label: "+1σ", data: toPts(plus1),
+              borderColor: "#00e58a", borderDash: [6,4],
+              borderWidth: 1.4, pointRadius: 0, tension: 0, order: 3 },
+            { label: "-1σ", data: toPts(minus1),
+              borderColor: "#ff3b4e", borderDash: [6,4],
+              borderWidth: 1.4, pointRadius: 0, tension: 0, order: 3 },
+            { label: "+2σ", data: toPts(plus2),
+              borderColor: "#c084fc", borderDash: [4,4],
+              borderWidth: 1.2, pointRadius: 0, tension: 0, order: 2 },
+            { label: "-2σ", data: toPts(minus2),
+              borderColor: "#ffb020", borderDash: [4,4],
+              borderWidth: 1.2, pointRadius: 0, tension: 0, order: 2 },
+            { label: "> +1σ", data: anomHigh, type: "scatter",
+              backgroundColor: "#35c7f0", borderColor: "#35c7f0",
+              pointRadius: 3, pointHoverRadius: 5, showLine: false, order: 1 },
+            { label: "< -1σ", data: anomLow, type: "scatter",
+              backgroundColor: "#fb923c", borderColor: "#fb923c",
+              pointRadius: 3, pointHoverRadius: 5, showLine: false, order: 1 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          interaction: { intersect: false, mode: "nearest", axis: "x" },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              position: "topLeft",
+              backgroundColor: "rgba(6,8,11,.96)",
+              borderColor: "rgba(0,229,138,.30)",
+              borderWidth: 1,
+              titleColor: "#e6ebf2",
+              bodyColor: "#e6ebf2",
+              filter: (item) => !['> +1σ', '< -1σ'].includes(item.dataset.label),
+              callbacks: {
+                title: (items) => {
+                  if (!items.length) return '';
+                  const d = new Date(items[0].parsed.x);
+                  return d.toISOString().slice(0, 10);
+                },
+                label: (c) => `${c.dataset.label}: ${fmtNum(c.parsed.y)}`
+              }
+            }
+          },
+          scales: {
+            x: {
+              type: "time",
+              time: { unit: meses > 36 ? "year" : (meses > 6 ? "month" : "week") },
+              ticks: { color: "rgba(230,235,242,.45)", maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
+              grid:  { color: "rgba(255,255,255,.05)" }
+            },
+            y: {
+              ticks: { color: "rgba(230,235,242,.45)", callback: (v) => fmtNum(v) },
+              grid:  { color: "rgba(255,255,255,.05)" }
+            }
+          }
+        }
+      });
+
+      const last = y[y.length-1];
+      const lastTrend = trend[trend.length-1];
+      const dev = ((last - lastTrend) / sd);
+      const fmtDate = (d) => d.toISOString().slice(0,10);
+
+      elTitle.textContent = `${nombre} — Últimos ${meses} meses`;
+      const yMin = Math.min.apply(null, minus2);
+      const yMax = Math.max.apply(null, plus2);
+      const xRange = x[x.length-1] - x[0];
+      const yRange = (yMax - yMin) || 1;
+      const normSlope = (slope * xRange) / yRange;
+      const angleDeg = (Math.atan(normSlope) * 180 / Math.PI).toFixed(2);
+      elMeta.textContent  = `${fmtDate(startDate)} → ${fmtDate(endDate)} · σ = ${fmtNum(sd)} · desviación actual ≈ ${dev.toFixed(2)}σ`;
+      buildLegend();
+      setStatus(`Listo. ${y.length} observaciones · ${anomHigh.length} anomalías > +1σ · ${anomLow.length} anomalías < -1σ · ángulo de tendencia: ${angleDeg}°`);
+    } catch (err) {
+      console.error(err);
+      setStatus("Error al generar el gráfico: " + (err && err.message ? err.message : err), "error");
+    } finally {
+      btnGen.disabled = false;
+    }
+  }
+
+  btnGen.addEventListener("click", generar);
+  [selActivo, inpMeses, inpFecha].forEach(el => {
+    el.addEventListener("keydown", (e) => { if (e.key === "Enter") generar(); });
+  });
+})();
+</script>
+<script>
+/* UTC session clock in the nav bar */
+(function(){
+  var out = document.getElementById("qtt-clock-val");
+  if (!out) return;
+  function tick(){
+    out.textContent = new Date().toISOString().slice(11, 19);
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+
+</body>
+</html>

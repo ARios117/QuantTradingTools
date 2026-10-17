@@ -1,0 +1,420 @@
+/* ==========================================================================
+   Portafolio Óptimo — page-specific layer on top of assets/css/terminal.css
+   ========================================================================== */
+
+/* ---------------------------------------------------------- shell -------- */
+.pf-card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.pf-card::before,
+.pf-card::after { content: none; }
+
+.pf-controls {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.pf-section-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+}
+
+/* ------------------------------------------------------ asset picker ----- */
+.pf-cats {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 12px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.pf-cat {
+  background: var(--void);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 12px;
+  min-width: 260px;
+  flex: 1 0 260px;
+}
+
+.pf-cat-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pf-cat-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.pf-cat-mini {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 3px 7px;
+  background: none;
+  white-space: nowrap;
+}
+
+.pf-cat-mini:hover { color: var(--long); border-color: rgba(0, 229, 138, .45); }
+
+.pf-cat-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 4px;
+  max-height: 316px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.pf-cat-grid::-webkit-scrollbar { width: 6px; }
+.pf-cat-grid::-webkit-scrollbar-track { background: transparent; }
+.pf-cat-grid::-webkit-scrollbar-thumb { background: var(--line); border-radius: 3px; }
+.pf-cat-grid::-webkit-scrollbar-thumb:hover { background: rgba(0, 229, 138, .45); }
+
+.pf-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border-radius: var(--r);
+  border: 1px solid transparent;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: var(--ink-70);
+  user-select: none;
+  transition: background .14s, border-color .14s, color .14s;
+}
+
+.pf-check:hover {
+  background: var(--panel-2);
+  border-color: var(--line);
+  color: var(--ink);
+}
+
+.pf-check input {
+  width: 14px;
+  height: 14px;
+  accent-color: var(--long);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.pf-check-name { overflow: hidden; text-overflow: ellipsis; min-width: 0; white-space: nowrap; }
+
+.pf-check-ticker {
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-28);
+  flex-shrink: 0;
+}
+
+.pf-yf-link {
+  margin-left: auto;
+  opacity: 0;
+  font-size: 10px;
+  color: var(--ink-45);
+  text-decoration: none;
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 1px 5px;
+  flex-shrink: 0;
+  transition: opacity .14s, color .14s, border-color .14s;
+}
+
+.pf-check:hover .pf-yf-link { opacity: 1; }
+.pf-yf-link:hover { color: var(--long); border-color: rgba(0, 229, 138, .45); }
+
+/* ----------------------------------------------------------- inputs ------ */
+.pf-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.pf-field { display: flex; flex-direction: column; gap: 6px; }
+
+.pf-field label {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+}
+
+.pf-field select,
+.pf-field input {
+  width: 100%;
+  background: var(--void);
+  border: 1px solid var(--line);
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 11px;
+  border-radius: var(--r);
+  outline: none;
+  color-scheme: dark;
+  transition: border-color .15s, box-shadow .15s;
+}
+
+.pf-field select option { background: var(--void); color: var(--ink); font-weight: 600; }
+
+.pf-field select:focus,
+.pf-field input:focus {
+  border-color: rgba(0, 229, 138, .55);
+  box-shadow: 0 0 0 2px rgba(0, 229, 138, .10);
+}
+
+/* ---------------------------------------------------------- results ------ */
+.pf-results {
+  position: relative;
+  z-index: 1;
+  display: none;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.pf-results.show { display: flex; }
+
+.pf-results-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.pf-results-title {
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: uppercase;
+  color: var(--ink);
+}
+
+.pf-results-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--ink-45);
+  font-weight: 500;
+}
+
+.pf-btn-pdf {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--ink-70);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+  padding: 7px 13px;
+  border-radius: var(--r);
+  cursor: pointer;
+  transition: color .15s, border-color .15s;
+}
+
+.pf-btn-pdf:hover { color: var(--long); border-color: rgba(0, 229, 138, .5); }
+.pf-btn-pdf:disabled { opacity: .45; cursor: not-allowed; }
+
+.pf-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.pf-grid-1 { display: grid; grid-template-columns: 1fr; gap: 14px; }
+
+.pf-panel {
+  background: var(--void);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+  min-width: 0;
+}
+
+.pf-panel-title {
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+/* ---------------------------------------------------------- weights ------ */
+.weights-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--ink);
+}
+
+.weights-table th,
+.weights-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  text-align: right;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.weights-table th {
+  color: var(--ink-45);
+  font-weight: 700;
+  font-size: 10px;
+  letter-spacing: .10em;
+  text-transform: uppercase;
+}
+
+.weights-table td:first-child,
+.weights-table th:first-child { text-align: left; font-weight: 700; color: var(--ink-70); }
+
+.weights-bar-cell {
+  position: relative;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line-soft);
+  min-width: 120px;
+}
+
+.weights-bar {
+  height: 6px;
+  background: var(--panel-2);
+  border-radius: 99px;
+  overflow: hidden;
+  position: relative;
+}
+
+.weights-bar-fill {
+  height: 100%;
+  background: var(--long);
+  border-radius: 99px;
+  box-shadow: 0 0 10px rgba(0, 229, 138, .35);
+}
+
+/* ---------------------------------------------------------- metrics ------ */
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.metric {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 11px 13px;
+}
+
+.metric-label {
+  font-family: var(--mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: .14em;
+  text-transform: uppercase;
+  color: var(--ink-28);
+  margin-bottom: 6px;
+}
+
+.metric-val {
+  font-family: var(--mono);
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--ink);
+  letter-spacing: -.01em;
+  font-variant-numeric: tabular-nums;
+}
+
+.metric-val.pos { color: var(--long); }
+.metric-val.neg { color: var(--short); }
+
+/* ----------------------------------------------------------- canvas ------ */
+.canvas-host { position: relative; width: 100%; height: 280px; }
+.canvas-host.tall { height: 340px; }
+.canvas-host.donut { height: 260px; }
+
+/* ------------------------------------------------------ correlation ------ */
+.corr-wrap { overflow: auto; max-height: 420px; }
+
+.corr-table {
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.corr-table th,
+.corr-table td {
+  padding: 5px 8px;
+  text-align: center;
+  border: 1px solid var(--line);
+  min-width: 42px;
+  color: var(--ink);
+}
+
+.corr-table th {
+  font-weight: 700;
+  color: var(--ink-45);
+  background: var(--panel-2);
+  position: sticky;
+  top: 0;
+  letter-spacing: .06em;
+}
+
+.corr-table th:first-child { position: sticky; left: 0; z-index: 2; }
+
+.corr-table td:first-child {
+  font-weight: 700;
+  color: var(--ink-70);
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--panel-2);
+  z-index: 1;
+}
+
+/* -------------------------------------------------------- responsive ----- */
+@media (max-width: 860px) {
+  .pf-card { padding: 13px; }
+  .pf-grid-2 { grid-template-columns: 1fr; }
+  .canvas-host { height: 240px; }
+  .canvas-host.tall { height: 280px; }
+}

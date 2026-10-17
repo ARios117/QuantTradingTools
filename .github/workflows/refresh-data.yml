@@ -1,0 +1,50 @@
+name: Refresh market data
+
+on:
+  schedule:
+    # 05:40 UTC daily — after the US close has settled, before EU open.
+    - cron: "40 5 * * *"
+  workflow_dispatch:
+    inputs:
+      scope:
+        description: Which snapshots to refresh
+        type: choice
+        default: all
+        options: [all, daily, intraday]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Fetch snapshots
+        run: |
+          case "${{ inputs.scope || 'all' }}" in
+            daily)    python3 scripts/fetch_data.py --daily ;;
+            intraday) python3 scripts/fetch_data.py --intraday ;;
+            *)        python3 scripts/fetch_data.py ;;
+          esac
+
+      - name: Commit refreshed snapshots
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data
+          if git diff --cached --quiet; then
+            echo "No hay cambios en los datos."
+            exit 0
+          fi
+          git commit -m "chore(data): refresh market snapshots $(date -u +%Y-%m-%d)"
+          git push

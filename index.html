@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Quant Terminal · Herramientas de análisis cuantitativo</title>
+  <meta name="description" content="Cuatro herramientas de análisis cuantitativo de mercado en el navegador: forecast GARCH, geometría fractal, detección de anomalías y optimización de portafolio." />
+  <link rel="icon" type="image/svg+xml" href="assets/favicon.svg" />
+  <link rel="stylesheet" href="assets/css/terminal.css" />
+
+  <style>
+    /* ---- index-only layout ------------------------------------------- */
+    .tape {
+      border-bottom: 1px solid var(--line);
+      background: var(--void);
+      overflow: hidden;
+      height: 32px;
+      display: flex;
+      align-items: center;
+    }
+    .tape-track {
+      display: flex;
+      gap: 34px;
+      white-space: nowrap;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .06em;
+      will-change: transform;
+      animation: slide 48s linear infinite;
+      padding-left: 24px;
+    }
+    .tape:hover .tape-track { animation-play-state: paused; }
+    @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+    .tape-item { color: var(--ink-45); }
+    .tape-item b { color: var(--ink); font-weight: 700; margin-right: 7px; }
+    .tape-item .up { color: var(--long); }
+    .tape-item .dn { color: var(--short); }
+
+    .grid-sec { padding: 40px 24px 56px; }
+    .grid-head {
+      max-width: 1480px;
+      margin: 0 auto 20px;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 14px;
+      flex-wrap: wrap;
+      border-bottom: 1px solid var(--line);
+      padding-bottom: 12px;
+    }
+    .grid-head h2 {
+      font-family: var(--mono);
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--ink);
+    }
+    .grid-head span {
+      font-family: var(--mono);
+      font-size: 10.5px;
+      letter-spacing: .10em;
+      text-transform: uppercase;
+      color: var(--ink-28);
+    }
+
+    .cards {
+      max-width: 1480px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+      gap: 14px;
+    }
+
+    .card {
+      display: flex;
+      flex-direction: column;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 18px;
+      text-decoration: none;
+      color: inherit;
+      position: relative;
+      overflow: hidden;
+      transition: border-color .16s, transform .16s, background .16s;
+    }
+    .card::after {
+      content: "";
+      position: absolute;
+      left: 0; top: 0; bottom: 0;
+      width: 2px;
+      background: var(--tone, var(--long));
+      opacity: .55;
+      transition: opacity .16s;
+    }
+    .card:hover {
+      border-color: color-mix(in srgb, var(--tone, var(--long)) 45%, var(--line));
+      background: var(--panel-2);
+      transform: translateY(-2px);
+    }
+    .card:hover::after { opacity: 1; }
+
+    .card-id {
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--tone, var(--long));
+      margin-bottom: 12px;
+    }
+    .card h3 {
+      font-family: var(--mono);
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      text-transform: uppercase;
+      line-height: 1.2;
+      margin-bottom: 9px;
+      color: var(--ink);
+    }
+    .card p {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: var(--ink-45);
+      margin-bottom: 14px;
+      flex: 1;
+    }
+    .card-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 14px; }
+    .card-tag {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      font-weight: 600;
+      letter-spacing: .09em;
+      text-transform: uppercase;
+      color: var(--ink-45);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 3px 7px;
+    }
+    .card-go {
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      color: var(--tone, var(--long));
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .card:hover .card-go { gap: 11px; }
+    .card-go span { transition: transform .16s; }
+
+    /* source / status strip */
+    .meta-sec { padding: 0 24px 56px; }
+    .meta-inner {
+      max-width: 1480px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      gap: 14px;
+    }
+    .meta-cell {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: var(--r);
+      padding: 14px 16px;
+    }
+    .meta-cell dt {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: .16em;
+      text-transform: uppercase;
+      color: var(--ink-28);
+      margin-bottom: 7px;
+    }
+    .meta-cell dd {
+      font-family: var(--mono);
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--ink);
+      letter-spacing: .02em;
+    }
+    .meta-cell dd small {
+      display: block;
+      margin-top: 5px;
+      font-family: var(--sans);
+      font-size: 12px;
+      font-weight: 400;
+      color: var(--ink-45);
+      letter-spacing: 0;
+      line-height: 1.55;
+    }
+
+    @media (max-width: 860px) {
+      .grid-sec { padding: 28px 16px 40px; }
+      .meta-sec { padding: 0 16px 40px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="./"><span class="nav-dot"></span>Quant&nbsp;Terminal</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-lbl">Mesa de análisis</span>
+    <span class="nav-clock" id="qtt-clock"><b>UTC</b> <span id="qtt-clock-val">--:--:--</span></span>
+  </div>
+</nav>
+
+<!-- TICKER TAPE -->
+<div class="tape" aria-hidden="true">
+  <div class="tape-track" id="tape"></div>
+</div>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-scan" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-pill"><span class="hero-pill-dot"></span>Mesa abierta · 4 módulos</div>
+    <h1>Análisis cuantitativo<br><em>sin salir del navegador</em></h1>
+    <p class="hero-sub">
+      Cuatro módulos que corren íntegramente en el cliente: volatilidad condicional,
+      geometría de series de precios, detección estadística de anomalías y
+      optimización media-varianza. Sin cuentas, sin backend, sin telemetría.
+    </p>
+    <div class="hero-wins">
+      <span class="hero-win"><span class="hero-win-dot"></span>GARCH(1,1)</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Monte Carlo</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Hurst &amp; fractales</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Frontera eficiente</span>
+    </div>
+  </div>
+</section>
+
+<!-- TOOL GRID -->
+<section class="grid-sec">
+  <div class="grid-head">
+    <h2>Módulos</h2>
+    <span>Cálculo local · datos de cierre</span>
+  </div>
+
+  <div class="cards">
+    <a class="card" href="analisis-forecast/" style="--tone:#00e58a">
+      <div class="card-id">01 — Forecast</div>
+      <h3>Forecast GARCH + Monte Carlo</h3>
+      <p>
+        Ajusta un GARCH(1,1) por máxima verosimilitud sobre los log-retornos y proyecta
+        el precio con 10 000 trayectorias de Monte Carlo, con bandas de confianza y
+        modo backtest contra fecha pasada.
+      </p>
+      <div class="card-tags">
+        <span class="card-tag">Volatilidad condicional</span>
+        <span class="card-tag">Cuantiles</span>
+        <span class="card-tag">Backtest</span>
+      </div>
+      <div class="card-go">Abrir módulo <span>&#8594;</span></div>
+    </a>
+
+    <a class="card" href="analisis-fractal/" style="--tone:#35c7f0">
+      <div class="card-id">02 — Fractal</div>
+      <h3>Geometría Fractal</h3>
+      <p>
+        Regresión lineal sobre el precio con bandas de desviación estándar a &plusmn;1σ y
+        &plusmn;2σ, marcando los cierres que rompen cada banda para leer la estructura
+        de la serie.
+      </p>
+      <div class="card-tags">
+        <span class="card-tag">Tendencia</span>
+        <span class="card-tag">Bandas σ</span>
+        <span class="card-tag">Desviaciones</span>
+      </div>
+      <div class="card-go">Abrir módulo <span>&#8594;</span></div>
+    </a>
+
+    <a class="card" href="analisis-anomalia/" style="--tone:#ffb020">
+      <div class="card-id">03 — Anomalías</div>
+      <h3>Detector de Anomalías</h3>
+      <p>
+        Z-score de los log-retornos sobre ventana móvil de 20 barras, con umbral a 2σ.
+        Nueve marcos temporales, desde velas de 1 minuto hasta mensuales, y tabla de
+        los últimos eventos detectados.
+      </p>
+      <div class="card-tags">
+        <span class="card-tag">Z-score móvil</span>
+        <span class="card-tag">Multi-timeframe</span>
+        <span class="card-tag">Intradía</span>
+      </div>
+      <div class="card-go">Abrir módulo <span>&#8594;</span></div>
+    </a>
+
+    <a class="card" href="analisis-portafolio/" style="--tone:#c084fc">
+      <div class="card-id">04 — Portafolio</div>
+      <h3>Portafolio Óptimo</h3>
+      <p>
+        Optimización media-varianza sobre un catálogo de más de 60 activos, con perfiles
+        de riesgo, frontera eficiente, alfa y beta contra el S&amp;P 500 y reparto de
+        capital por peso.
+      </p>
+      <div class="card-tags">
+        <span class="card-tag">Media-varianza</span>
+        <span class="card-tag">Sharpe</span>
+        <span class="card-tag">Alfa / Beta</span>
+      </div>
+      <div class="card-go">Abrir módulo <span>&#8594;</span></div>
+    </a>
+  </div>
+</section>
+
+<!-- META -->
+<section class="meta-sec">
+  <div class="grid-head">
+    <h2>Estado de los datos</h2>
+    <span id="meta-src">Comprobando fuente…</span>
+  </div>
+  <dl class="meta-inner">
+    <div class="meta-cell">
+      <dt>Último refresco</dt>
+      <dd id="meta-updated">—<small>Los snapshots se regeneran a diario mediante GitHub Actions.</small></dd>
+    </div>
+    <div class="meta-cell">
+      <dt>Series disponibles</dt>
+      <dd id="meta-count">—<small>Cierres diarios desde 1990 más marcos intradía para el detector.</small></dd>
+    </div>
+    <div class="meta-cell">
+      <dt>Fuente</dt>
+      <dd>Yahoo Finance<small>Vía snapshot estático en hosting sin PHP, o en directo si existe proxy.php.</small></dd>
+    </div>
+    <div class="meta-cell">
+      <dt>Cómputo</dt>
+      <dd>100&#37; cliente<small>Todo el cálculo numérico corre en tu navegador. No se envía ningún dato.</small></dd>
+    </div>
+  </dl>
+</section>
+
+<!-- DISCLAIMER -->
+<section class="info-band">
+  <div class="info-inner">
+    <span class="info-pill">Aviso importante</span>
+    <h2 class="info-title">No constituye asesoramiento de inversión</h2>
+    <div class="info-box">
+      Estas herramientas son material educativo e informativo. Los modelos estadísticos que
+      implementan describen el comportamiento pasado de una serie de precios y no predicen
+      su comportamiento futuro. Ninguna salida de esta mesa debe interpretarse como una
+      recomendación de compra o venta.
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-inner">
+    Quant Terminal &nbsp;·&nbsp; Datos: Yahoo Finance &nbsp;·&nbsp;
+    Uso educativo, no es asesoramiento financiero
+  </div>
+</footer>
+
+<script>
+/* ---- UTC session clock ------------------------------------------------- */
+(function(){
+  var out = document.getElementById("qtt-clock-val");
+  function tick(){ out.textContent = new Date().toISOString().slice(11, 19); }
+  tick();
+  setInterval(tick, 1000);
+})();
+
+/* ---- ticker tape + data status, both read from the snapshot set -------- */
+(function(){
+  var TAPE = [
+    ["^GSPC", "S&P 500", "_gspc"],
+    ["^NDX", "Nasdaq 100", "_ndx"],
+    ["BTC-USD", "Bitcoin", "btc_usd"],
+    ["ETH-USD", "Ethereum", "eth_usd"],
+    ["GC=F", "Oro", "gc_f"],
+    ["CL=F", "Crudo WTI", "cl_f"],
+    ["NVDA", "Nvidia", "nvda"],
+    ["AAPL", "Apple", "aapl"],
+    ["MSFT", "Microsoft", "msft"],
+    ["TLT", "Bonos 20y", "tlt"]
+  ];
+
+  var track = document.getElementById("tape");
+
+  function render(rows){
+    if (!rows.length){ track.parentNode.style.display = "none"; return; }
+    // Duplicated so the -50% keyframe loops seamlessly.
+    track.innerHTML = rows.concat(rows).map(function (row){
+      var cls = row.change >= 0 ? "up" : "dn";
+      var sign = row.change >= 0 ? "+" : "";
+      return '<span class="tape-item"><b>' + row.label + "</b>" +
+             row.price + ' <span class="' + cls + '">' + sign +
+             row.change.toFixed(2) + "%</span></span>";
+    }).join("");
+  }
+
+  function fmt(value){
+    return value >= 1000
+      ? value.toLocaleString("es-ES", { maximumFractionDigits: 0 })
+      : value.toLocaleString("es-ES", { maximumFractionDigits: 2 });
+  }
+
+  Promise.all(TAPE.map(function (entry){
+    return fetch("data/daily/" + entry[2] + ".json", { cache: "no-cache" })
+      .then(function (res){ return res.ok ? res.json() : null; })
+      .then(function (snap){
+        if (!snap || !snap.prices || snap.prices.length < 2) return null;
+        var prices = snap.prices;
+        var last = prices[prices.length - 1][1];
+        var prev = prices[prices.length - 2][1];
+        return { label: entry[1], price: fmt(last), change: ((last - prev) / prev) * 100 };
+      })
+      .catch(function (){ return null; });
+  })).then(function (rows){
+    render(rows.filter(Boolean));
+  });
+
+  fetch("data/manifest.json", { cache: "no-cache" })
+    .then(function (res){ return res.ok ? res.json() : null; })
+    .then(function (manifest){
+      if (!manifest) throw new Error("sin manifest");
+      var updated = document.getElementById("meta-updated");
+      var count = document.getElementById("meta-count");
+      var symbols = Object.keys(manifest.series || {});
+      var total = symbols.reduce(function (acc, key){
+        return acc + Object.keys(manifest.series[key]).length;
+      }, 0);
+
+      if (manifest.updated){
+        var when = new Date(manifest.updated);
+        updated.firstChild.nodeValue = when.toISOString().slice(0, 16).replace("T", " ") + " UTC";
+      }
+      count.firstChild.nodeValue = total + " series · " + symbols.length + " activos";
+      document.getElementById("meta-src").textContent = "Snapshot estático · sin backend";
+    })
+    .catch(function (){
+      document.getElementById("meta-src").textContent = "Snapshot no disponible";
+    });
+})();
+</script>
+
+</body>
+</html>

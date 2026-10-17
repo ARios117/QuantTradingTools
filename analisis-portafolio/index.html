@@ -1,0 +1,1091 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Portafolio Óptimo · Quant Terminal</title>
+  <link rel="icon" type="image/svg+xml" href="../assets/favicon.svg" />
+
+
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+  <link rel="stylesheet" href="../assets/css/terminal.css" />
+  <link rel="stylesheet" href="page.css" />
+  <script src="../assets/js/market-data.js"></script>
+</head>
+<body>
+
+<!-- NAV -->
+<nav class="nav">
+  <div class="nav-inner">
+    <a class="nav-brand" href="../"><span class="nav-dot"></span>Quant&nbsp;Terminal</a>
+    <span class="nav-sep">/</span>
+    <span class="nav-lbl">Portafolio Óptimo</span>
+    <span class="nav-clock" id="qtt-clock"><b>UTC</b> <span id="qtt-clock-val">--:--:--</span></span>
+  </div>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-scan" aria-hidden="true"></div>
+  <div class="hero-inner">
+    <div class="hero-pill"><span class="hero-pill-dot"></span>Quant Terminal · PORTAFOLIO</div>
+    <h1>Optimización de <em>portafolio</em></h1>
+    <p class="hero-sub">Multi-start global sobre el simplex de pesos para encontrar la cartera que maximiza Sharpe o Calmar entre los activos seleccionados.</p>
+    <div class="hero-wins">
+      <span class="hero-win"><span class="hero-win-dot"></span>Sharpe · Estándar</span>
+      <span class="hero-win"><span class="hero-win-dot"></span>Calmar · Conservador</span>
+    </div>
+  </div>
+</section>
+
+<!-- WAVE hero→tool -->
+
+<!-- TOOL SECTION -->
+<section class="light-sec">
+  <div class="light-inner">
+    <div class="tool-header">
+      <span class="light-pill">Herramienta interactiva</span>
+      <h2 class="light-title">Optimización <em>multi-start</em></h2>
+    </div>
+
+    <div class="pf-card">
+      <div class="pf-controls">
+        <div>
+          <div class="pf-section-title">Activos a incluir</div>
+          <div class="pf-cats" id="cats-container"></div>
+        </div>
+
+        <div class="pf-row">
+          <div class="pf-field">
+            <label for="perfil">Perfil de análisis</label>
+            <select id="perfil">
+              <option value="sharpe" selected>Estándar · Sharpe</option>
+              <option value="calmar">Conservador · Calmar</option>
+              <option value="rvoldd">Balanceado · R/(σ+DD)</option>
+            </select>
+          </div>
+          <div class="pf-field">
+            <label for="capital">Capital inicial (USD)</label>
+            <input id="capital" type="number" min="100" step="100" value="10000" />
+          </div>
+          <div class="pf-field">
+            <label for="start-year">Año inicio</label>
+            <input id="start-year" type="number" min="1990" max="2024" step="1" value="2000" />
+          </div>
+          <div class="pf-field">
+            <label>&nbsp;</label>
+            <button id="btn-optimizar" class="btn-primary" type="button">Optimizar Portafolio</button>
+          </div>
+        </div>
+
+        <div class="status" id="status">Selecciona los activos, perfil y pulsa "Optimizar Portafolio".</div>
+      </div>
+
+      <div class="pf-results" id="results">
+        <div class="pf-results-head">
+          <div class="pf-results-title" id="results-title">Resultado del portafolio óptimo</div>
+          <div class="pf-results-meta" id="results-meta">—</div>
+          <button type="button" id="btn-pdf" class="pf-btn-pdf" title="Descargar resultados en PDF">
+            <span style="font-size:14px;">⬇</span> Descargar PDF
+          </button>
+        </div>
+
+        <div class="pf-grid-2">
+          <div class="pf-panel">
+            <div class="pf-panel-title">Pesos óptimos</div>
+            <div id="weights-table-host"></div>
+          </div>
+          <div class="pf-panel">
+            <div class="pf-panel-title">Distribución</div>
+            <div class="canvas-host donut"><canvas id="chart-pie"></canvas></div>
+          </div>
+        </div>
+
+        <div class="pf-panel">
+          <div class="pf-panel-title">Métricas del portafolio</div>
+          <div class="metrics-grid" id="metrics-grid"></div>
+        </div>
+
+        <div class="pf-panel">
+          <div class="pf-panel-title">Evolución del valor (capital inicial: <span id="capi-shown">$10.000</span>)</div>
+          <div class="canvas-host tall"><canvas id="chart-equity"></canvas></div>
+        </div>
+
+        <div class="pf-panel">
+          <div class="pf-panel-title">Drawdown histórico</div>
+          <div class="canvas-host"><canvas id="chart-dd"></canvas></div>
+        </div>
+
+        <div class="pf-panel" id="corr-section">
+          <div class="pf-panel-title">Matriz de correlación (retornos diarios)</div>
+          <div class="corr-wrap" id="corr-host"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- WAVE light→info -->
+
+<section class="info-band">
+  <div class="info-inner">
+    <span class="info-pill">Aviso importante</span>
+    <h2 class="info-title">No constituye una estrategia<br>de inversión</h2>
+    <div class="info-box">
+      Este programa optimiza pesos de cartera maximizando Sharpe o Calmar sobre datos históricos. La rentabilidad pasada no garantiza rentabilidad futura. Es una herramienta de análisis exclusivamente educativa.
+    </div>
+  </div>
+</section>
+
+<footer class="foot">
+  <div class="foot-inner">
+    Quant Terminal · PORTAFOLIO &nbsp;·&nbsp; Datos: Yahoo Finance &nbsp;·&nbsp;
+    Uso educativo, no es asesoramiento financiero &nbsp;·&nbsp;
+    <a href="../">&#8592; Índice de herramientas</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  /* ============================================================
+     CATÁLOGO DE ACTIVOS — categorías + nombres + tickers
+     ============================================================ */
+  const CATALOG = {
+    "ETFs / Índices": [
+      { ticker:"^NDX",             name:"NASDAQ100" },
+      { ticker:"^GSPC",            name:"S&P500" },
+      { ticker:"^DJI",             name:"DOW JONES" },
+      { ticker:"URTH",             name:"MSCI WORLD" },
+      { ticker:"QDVE.DE",          name:"S&P500-TECH" },
+      { ticker:"SMH",              name:"SEMICONDUCTOR ETF" },
+      { ticker:"AIQ",              name:"AI & TECH ETF" },
+      { ticker:"VWO",              name:"EMERGING MARKETS ETF" },
+      { ticker:"EWJ",              name:"JAPAN ETF" },
+      { ticker:"FXI",              name:"CHINA ETF" }
+    ],
+    "Bonos": [
+      { ticker:"TLT",              name:"US TREASURY 20+ YR" },
+      { ticker:"IEF",              name:"US TREASURY 7-10 YR" },
+      { ticker:"SHY",              name:"US TREASURY 1-3 YR" },
+      { ticker:"AGG",              name:"US AGGREGATE BOND" },
+      { ticker:"LQD",              name:"CORPORATE BOND IG" },
+      { ticker:"HYG",              name:"HIGH YIELD BOND" },
+      { ticker:"EMB",              name:"EMERGING MARKETS BOND" }
+    ],
+    "Cryptos": [
+      { ticker:"BTC-USD",          name:"BTC" },
+      { ticker:"ETH-USD",          name:"ETHEREUM" },
+      { ticker:"SOL-USD",          name:"SOLANA" },
+      { ticker:"XRP-USD",          name:"XRP" },
+      { ticker:"BNB-USD",          name:"BNB" },
+      { ticker:"TRX-USD",          name:"TRON" }
+    ],
+    "Acciones": [
+      { ticker:"BRK-B",            name:"BERKSHIRE" },
+      { ticker:"AMZN",             name:"AMAZON" },
+      { ticker:"AAPL",             name:"APPLE" },
+      { ticker:"MSFT",             name:"MICROSOFT" },
+      { ticker:"NVDA",             name:"NVIDIA" },
+      { ticker:"TSLA",             name:"TESLA" },
+      { ticker:"GOOG",             name:"GOOGLE / ALPHABET" },
+      { ticker:"META",             name:"META" },
+      { ticker:"TCEHY",            name:"TENCENT" },
+      { ticker:"TSM",              name:"TAIWAN S.CONDUCTOR" },
+      { ticker:"NFLX",             name:"NETFLIX" },
+      { ticker:"AZO",              name:"AUTOZONE" },
+      { ticker:"AVGO",             name:"BROADCOM" },
+      { ticker:"JPM",              name:"JPMORGAN" },
+      { ticker:"UNH",              name:"UNITEDHEALTH" },
+      { ticker:"LLY",              name:"ELI LILLY" },
+      { ticker:"V",                name:"VISA" },
+      { ticker:"MA",               name:"MASTERCARD" },
+      { ticker:"WMT",              name:"WALMART" },
+      { ticker:"ORCL",             name:"ORACLE" },
+      { ticker:"AMD",              name:"AMD" },
+      { ticker:"MU",               name:"MICRON" },
+      { ticker:"ASML",             name:"ASML" },
+      { ticker:"XOM",              name:"EXXON MOBIL" },
+      { ticker:"INTC",             name:"INTEL" },
+      { ticker:"JNJ",              name:"JOHNSON & JOHNSON" },
+      { ticker:"KO",               name:"COCA-COLA" },
+      { ticker:"PG",               name:"PROCTER & GAMBLE" },
+      { ticker:"CAT",              name:"CATERPILLAR" },
+      { ticker:"HD",               name:"HOME DEPOT" },
+      { ticker:"CVX",              name:"CHEVRON" },
+      { ticker:"COST",             name:"COSTCO" },
+      { ticker:"PLTR",             name:"PALANTIR" },
+      { ticker:"ARM",              name:"ARM HOLDINGS" },
+      { ticker:"ABBV",             name:"ABBVIE" }
+    ],
+    "Materias Primas": [
+      { ticker:"GC=F",             name:"GOLD" },
+      { ticker:"SI=F",             name:"PLATA" },
+      { ticker:"HG=F",             name:"COBRE" },
+      { ticker:"PL=F",             name:"PLATINO" },
+      { ticker:"CL=F",             name:"PETROLEO WTI" },
+      { ticker:"NG=F",             name:"GAS NATURAL" },
+      { ticker:"ZW=F",             name:"TRIGO" },
+      { ticker:"ZC=F",             name:"MAIZ" }
+    ]
+  };
+
+  // Tickers marcados por defecto
+  const DEFAULT_CHECKED = new Set([
+    "GC=F","QDVE.DE","BTC-USD","SMH","AAPL"
+  ]);
+
+  const PIE_COLORS = [
+    "#00e58a","#35c7f0","#ffb020","#ff3b4e","#c084fc","#22d3ee","#fb923c",
+    "#f472b6","#a3e635","#facc15","#2dd4bf","#818cf8","#fb7185","#67e8f9",
+    "#4ade80","#e879f9","#38bdf8","#fcd34d","#a78bfa","#6ee7b7","#f87171",
+    "#fde047","#7dd3fc"
+  ];
+
+  /* ============================================================
+     DOM
+     ============================================================ */
+  const $ = (id) => document.getElementById(id);
+  const catsContainer = $("cats-container");
+  const selPerfil   = $("perfil");
+  const inpCapital  = $("capital");
+  const inpYear     = $("start-year");
+  const btnOpt      = $("btn-optimizar");
+  const elStatus    = $("status");
+  const elResults   = $("results");
+  const elResTitle  = $("results-title");
+  const elResMeta   = $("results-meta");
+  const elWeightsHost = $("weights-table-host");
+  const elMetricsGrid = $("metrics-grid");
+  const elCapiShown   = $("capi-shown");
+  const elCorrHost    = $("corr-host");
+  const canvasPie    = $("chart-pie");
+  const canvasEquity = $("chart-equity");
+  const canvasDD     = $("chart-dd");
+
+  const setStatus = (m,k)=>{ elStatus.className="status"+(k?" "+k:""); elStatus.textContent=m; };
+  const fmtPct  = (v, d=2) => (v*100).toLocaleString("es-ES",{maximumFractionDigits:d, minimumFractionDigits:d}) + "%";
+  const fmtNum  = (v, d=4) => v.toLocaleString("es-ES",{maximumFractionDigits:d, minimumFractionDigits:d});
+  const fmtUSD  = (v) => "$" + v.toLocaleString("es-ES",{maximumFractionDigits:0});
+  const fmtISO  = (ms) => { const d=new Date(ms); return d.toISOString().slice(0,10); };
+
+  /* ============================================================
+     CHECKBOXES por categoría
+     ============================================================ */
+  function renderCatalog(){
+    catsContainer.innerHTML = "";
+    for (const [catName, items] of Object.entries(CATALOG)){
+      const cat = document.createElement("div"); cat.className = "pf-cat";
+      const head = document.createElement("div"); head.className = "pf-cat-head";
+      const title = document.createElement("span"); title.className = "pf-cat-title"; title.textContent = catName;
+      const mini = document.createElement("button");
+      mini.type = "button"; mini.className = "pf-cat-mini"; mini.textContent = "todos / ninguno";
+      mini.addEventListener("click", () => {
+        const checks = cat.querySelectorAll('input[type="checkbox"]');
+        const allOn = Array.from(checks).every(c => c.checked);
+        checks.forEach(c => c.checked = !allOn);
+      });
+      head.appendChild(title); head.appendChild(mini);
+      cat.appendChild(head);
+
+      const grid = document.createElement("div"); grid.className = "pf-cat-grid";
+      for (const it of items){
+        const lbl = document.createElement("label"); lbl.className = "pf-check";
+        lbl.title = it.name + " · " + it.ticker;
+        const cb = document.createElement("input");
+        cb.type = "checkbox"; cb.value = it.ticker; cb.dataset.name = it.name;
+        cb.checked = DEFAULT_CHECKED.has(it.ticker);
+        const txt = document.createElement("span"); txt.className = "pf-check-name"; txt.textContent = it.name;
+        const tk  = document.createElement("span"); tk.className = "pf-check-ticker"; tk.textContent = "· " + it.ticker;
+        const yf  = document.createElement("a");
+        yf.className = "pf-yf-link";
+        yf.href = "https://finance.yahoo.com/quote/" + encodeURIComponent(it.ticker) + "/";
+        yf.target = "_blank"; yf.rel = "noopener noreferrer";
+        yf.textContent = "↗";
+        yf.title = "Ver en Yahoo Finance";
+        yf.addEventListener("click", e => e.stopPropagation());
+        lbl.appendChild(cb); lbl.appendChild(txt); lbl.appendChild(tk); lbl.appendChild(yf);
+        grid.appendChild(lbl);
+      }
+      cat.appendChild(grid);
+      catsContainer.appendChild(cat);
+    }
+  }
+
+  function getSelectedAssets(){
+    const out = [];
+    catsContainer.querySelectorAll('input[type="checkbox"]:checked').forEach(cb => {
+      out.push({ ticker: cb.value, name: cb.dataset.name });
+    });
+    return out;
+  }
+
+  /* ============================================================
+     FETCH SERIES
+     ============================================================ */
+  async function fetchSeries(ticker, fromISO, toISO){
+    try {
+      return await QTT.series({ ticker, symbol: ticker, interval: "1d", from: fromISO, to: toISO });
+    } catch(err){
+      throw new Error(`${ticker}: ${err.message}`);
+    }
+  }
+
+  /* ============================================================
+     ALINEAR SERIES por intersección de fechas (truncadas a día UTC)
+     ============================================================ */
+  function alignSeries(seriesMap){
+    // seriesMap = { ticker: [{t,y}, ...] }
+    const tickers = Object.keys(seriesMap);
+    // Convertir cada serie a Map(dayKey -> price)
+    const maps = {};
+    for (const tk of tickers){
+      const m = new Map();
+      for (const p of seriesMap[tk]){
+        const day = Math.floor(p.t / 86400000);
+        m.set(day, p.y);
+      }
+      maps[tk] = m;
+    }
+    // Intersección
+    let commonDays = null;
+    for (const tk of tickers){
+      const set = new Set(maps[tk].keys());
+      if (commonDays === null) commonDays = set;
+      else { for (const d of commonDays) if (!set.has(d)) commonDays.delete(d); }
+    }
+    const sortedDays = Array.from(commonDays).sort((a,b)=>a-b);
+    const T = sortedDays.length;
+    const N = tickers.length;
+    const prices = new Float64Array(T * N);
+    for (let t=0;t<T;t++){
+      const d = sortedDays[t];
+      for (let n=0;n<N;n++){
+        prices[t*N + n] = maps[tickers[n]].get(d);
+      }
+    }
+    return { tickers, T, N, days: sortedDays, prices };
+  }
+
+  // Retornos pct_change a partir de prices flat (T,N) → R (T-1, N)
+  function toReturns(prices, T, N){
+    const Tret = T - 1;
+    const R = new Float64Array(Tret * N);
+    for (let t=1;t<T;t++){
+      for (let n=0;n<N;n++){
+        const p0 = prices[(t-1)*N + n];
+        const p1 = prices[t*N + n];
+        R[(t-1)*N + n] = p1/p0 - 1;
+      }
+    }
+    return { R, Tret };
+  }
+
+  /* ============================================================
+     EVALUADORES DE MÉTRICAS — operan sobre R (Float64Array) y w (Float64Array)
+     ============================================================ */
+  const ANN = 252;
+
+  function portfolioDaily(R, w, T, N, out){
+    for (let t=0;t<T;t++){
+      let s = 0;
+      const base = t*N;
+      for (let n=0;n<N;n++) s += R[base+n] * w[n];
+      out[t] = s;
+    }
+  }
+
+  function scoreSharpe(R, w, T, N, buf){
+    portfolioDaily(R, w, T, N, buf);
+    let sum=0, sum2=0;
+    for (let t=0;t<T;t++){ const v=buf[t]; sum+=v; sum2+=v*v; }
+    const mean = sum/T;
+    const variance = Math.max(0, sum2/T - mean*mean);
+    const vol = Math.sqrt(variance) * Math.sqrt(ANN);
+    if (vol <= 0) return -1e9;
+    return (mean*ANN) / vol;
+  }
+
+  function scoreCalmar(R, w, T, N, buf){
+    portfolioDaily(R, w, T, N, buf);
+    let sum=0, equity=1, maxEq=1, maxDD=0;
+    for (let t=0;t<T;t++){
+      const v = buf[t];
+      sum += v;
+      equity *= (1 + v);
+      if (equity > maxEq) maxEq = equity;
+      const dd = (equity - maxEq) / maxEq;
+      if (dd < maxDD) maxDD = dd;
+    }
+    if (maxDD >= 0) return -1e9;
+    const mean = sum/T;
+    return (mean*ANN) / Math.abs(maxDD);
+  }
+
+  // Balanceado: R_anual / (σ_anual + |DD_max|)
+  function scoreRVolDD(R, w, T, N, buf){
+    portfolioDaily(R, w, T, N, buf);
+    let sum=0, sum2=0, equity=1, maxEq=1, maxDD=0;
+    for (let t=0;t<T;t++){
+      const v = buf[t];
+      sum += v; sum2 += v*v;
+      equity *= (1 + v);
+      if (equity > maxEq) maxEq = equity;
+      const dd = (equity - maxEq) / maxEq;
+      if (dd < maxDD) maxDD = dd;
+    }
+    const mean = sum/T;
+    const variance = Math.max(0, sum2/T - mean*mean);
+    const vol = Math.sqrt(variance) * Math.sqrt(ANN);
+    const denom = vol + Math.abs(maxDD);
+    if (denom <= 0) return -1e9;
+    return (mean*ANN) / denom;
+  }
+
+  /* ============================================================
+     OPTIMIZADOR — Random Dirichlet + Hill Climbing
+     ============================================================ */
+  function randomDirichlet(N, w){
+    let sum = 0;
+    for (let i=0;i<N;i++){
+      const g = -Math.log(Math.random() + 1e-12); // gamma(1) ~ exponencial
+      w[i] = g; sum += g;
+    }
+    for (let i=0;i<N;i++) w[i] /= sum;
+  }
+
+  function randn(){
+    let u=0,v=0;
+    while(u===0) u=Math.random();
+    while(v===0) v=Math.random();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+
+  function optimize(R, T, N, scoreFn, opts){
+    const N_RANDOM = opts.nRandom || 3000;
+    const TOP_K    = opts.topK    || 25;
+    const HC_ITERS = opts.hcIters || 300;
+    const SIGMA0   = opts.sigma0  || 0.08;
+
+    const buf = new Float64Array(T);
+    const w   = new Float64Array(N);
+
+    // 1) Random sampling
+    const cands = [];
+    for (let i=0;i<N_RANDOM;i++){
+      randomDirichlet(N, w);
+      const sc = scoreFn(R, w, T, N, buf);
+      cands.push({ w: Float64Array.from(w), score: sc });
+    }
+    // Más también: pesos iguales como start
+    w.fill(1/N);
+    cands.push({ w: Float64Array.from(w), score: scoreFn(R, w, T, N, buf) });
+    // Cada activo solo
+    for (let n=0;n<N;n++){
+      w.fill(0); w[n] = 1;
+      cands.push({ w: Float64Array.from(w), score: scoreFn(R, w, T, N, buf) });
+    }
+
+    cands.sort((a,b)=> b.score - a.score);
+    const top = cands.slice(0, TOP_K);
+
+    // 2) Hill climbing local sobre cada top
+    let best = top[0];
+    const trial = new Float64Array(N);
+    for (const cand of top){
+      let curW = Float64Array.from(cand.w);
+      let curS = cand.score;
+      for (let it=0; it<HC_ITERS; it++){
+        const sigma = SIGMA0 * (1 - it/HC_ITERS) + 0.005;
+        // Elegir dos índices y mover delta de uno a otro
+        const i = Math.floor(Math.random() * N);
+        let j = Math.floor(Math.random() * N);
+        if (j === i) j = (j+1) % N;
+        const delta = randn() * sigma;
+        trial.set(curW);
+        let ni = trial[i] + delta;
+        let nj = trial[j] - delta;
+        if (ni < 0){ nj += ni; ni = 0; }
+        if (nj < 0){ ni += nj; nj = 0; }
+        if (ni < 0 || nj < 0) continue;
+        trial[i] = ni; trial[j] = nj;
+        // Por consistencia normalizar (con cualquier drift numérico)
+        let s = 0; for (let n=0;n<N;n++) s += trial[n];
+        if (s <= 0) continue;
+        for (let n=0;n<N;n++) trial[n] /= s;
+        const sc = scoreFn(R, trial, T, N, buf);
+        if (sc > curS){ curS = sc; curW = Float64Array.from(trial); }
+      }
+      if (curS > best.score) best = { w: curW, score: curS };
+    }
+    return best;
+  }
+
+  /* ============================================================
+     MÉTRICAS COMPLETAS — para el portafolio óptimo
+     ============================================================ */
+  function fullMetrics(R, w, T, N, days, marketReturns){
+    // days length = T (de retornos), marketReturns alineados o null
+    const port = new Float64Array(T);
+    portfolioDaily(R, w, T, N, port);
+
+    let sumR=0, sumR2=0;
+    for (let t=0;t<T;t++){ sumR+=port[t]; sumR2+=port[t]*port[t]; }
+    const meanD = sumR/T;
+    const varD  = Math.max(0, sumR2/T - meanD*meanD);
+    const annual_return     = meanD * ANN;
+    const annual_volatility = Math.sqrt(varD) * Math.sqrt(ANN);
+
+    // downside
+    let downsq=0;
+    for (let t=0;t<T;t++){ const d=port[t]; if (d<0) downsq+=d*d; }
+    const downside_dev_annual = Math.sqrt(downsq/T) * Math.sqrt(ANN);
+
+    // equity y drawdown
+    const equity = new Float64Array(T);
+    const dd     = new Float64Array(T);
+    let eq = 1, mx = 1, maxDD = 0;
+    for (let t=0;t<T;t++){
+      eq *= (1 + port[t]);
+      equity[t] = eq;
+      if (eq > mx) mx = eq;
+      const dr = (eq - mx) / mx;
+      dd[t] = dr;
+      if (dr < maxDD) maxDD = dr;
+    }
+
+    const sharpe  = annual_volatility > 0 ? annual_return / annual_volatility : 0;
+    const sortino = downside_dev_annual > 0 ? annual_return / downside_dev_annual : 0;
+    const calmar  = maxDD < 0 ? annual_return / Math.abs(maxDD) : 0;
+
+    // VaR percentil 5 y 1 (diarios)
+    const sorted = Array.from(port).sort((a,b)=>a-b);
+    const idx5 = Math.max(0, Math.floor(0.05 * T));
+    const idx1 = Math.max(0, Math.floor(0.01 * T));
+    const VaR_95 = sorted[idx5];
+    const VaR_99 = sorted[idx1];
+
+    // Último año
+    const lastMs = days[days.length-1];
+    const oneYearMs = lastMs - 365*86400000;
+    let lyStartIdx = T - 1;
+    for (let t=0; t<T; t++){ if (days[t] >= oneYearMs){ lyStartIdx = t; break; } }
+    let eqLY = 1, mxLY = 1, maxDDLY = 0, maxProfitLY = 0;
+    for (let t=lyStartIdx; t<T; t++){
+      eqLY *= (1 + port[t]);
+      if (eqLY > mxLY) mxLY = eqLY;
+      const dr = (eqLY - mxLY) / mxLY;
+      if (dr < maxDDLY) maxDDLY = dr;
+      if (eqLY - 1 > maxProfitLY) maxProfitLY = eqLY - 1;
+    }
+
+    // Alpha / Beta vs market — regresión OLS
+    let alpha_daily = 0, beta = 0, alpha_annual = 0;
+    if (marketReturns){
+      let mSum=0, pSum=0, mpSum=0, m2Sum=0;
+      let count = 0;
+      for (let t=0;t<T;t++){
+        const m = marketReturns[t];
+        if (!isFinite(m)) continue;
+        const p = port[t];
+        mSum += m; pSum += p; mpSum += m*p; m2Sum += m*m;
+        count++;
+      }
+      if (count > 1){
+        const mMean = mSum/count, pMean = pSum/count;
+        const cov = mpSum/count - mMean*pMean;
+        const vm  = m2Sum/count - mMean*mMean;
+        beta = vm > 0 ? cov/vm : 0;
+        alpha_daily = pMean - beta * mMean;
+        alpha_annual = alpha_daily * ANN;
+      }
+    }
+
+    return {
+      port, equity, dd,
+      annual_return, annual_volatility, downside_dev_annual,
+      max_drawdown: maxDD, sharpe, sortino, calmar,
+      VaR_95, VaR_99,
+      max_drawdown_ly: maxDDLY, max_profit_ly: maxProfitLY,
+      alpha_daily, alpha_annual, beta
+    };
+  }
+
+  /* ============================================================
+     CORRELACIÓN
+     ============================================================ */
+  function corrMatrix(R, T, N){
+    const means = new Float64Array(N), vars_ = new Float64Array(N);
+    for (let n=0;n<N;n++){
+      let s=0, s2=0;
+      for (let t=0;t<T;t++){ const v=R[t*N+n]; s+=v; s2+=v*v; }
+      means[n] = s/T;
+      vars_[n] = Math.max(1e-20, s2/T - means[n]*means[n]);
+    }
+    const C = new Array(N);
+    for (let i=0;i<N;i++) C[i] = new Float64Array(N);
+    for (let i=0;i<N;i++){
+      for (let j=i;j<N;j++){
+        if (i===j){ C[i][j] = 1; continue; }
+        let c = 0;
+        for (let t=0;t<T;t++) c += (R[t*N+i] - means[i]) * (R[t*N+j] - means[j]);
+        c /= T;
+        const r = c / Math.sqrt(vars_[i] * vars_[j]);
+        C[i][j] = r; C[j][i] = r;
+      }
+    }
+    return C;
+  }
+
+  /* ============================================================
+     RENDER — pesos, métricas, charts, correlación
+     ============================================================ */
+  let chartPie = null, chartEquity = null, chartDD = null;
+
+  function renderWeightsTable(names, weights){
+    const idx = names.map((_,i)=>i).sort((a,b)=> weights[b] - weights[a]);
+    let html = '<table class="weights-table"><thead><tr><th>Activo</th><th>%</th><th></th></tr></thead><tbody>';
+    const maxW = Math.max(...weights, 1e-9);
+    for (const i of idx){
+      const w = weights[i];
+      const pct = (w*100).toFixed(2);
+      const pctBar = (w/maxW)*100;
+      html += `<tr><td>${names[i]}</td><td>${pct}%</td>`;
+      html += `<td class="weights-bar-cell"><div class="weights-bar"><div class="weights-bar-fill" style="width:${pctBar}%"></div></div></td></tr>`;
+    }
+    html += '</tbody></table>';
+    elWeightsHost.innerHTML = html;
+  }
+
+  function renderPie(names, weights){
+    const labels = [], data = [], colors = [];
+    const idx = names.map((_,i)=>i).sort((a,b)=> weights[b] - weights[a]);
+    let k = 0;
+    for (const i of idx){
+      if (weights[i] < 1e-4) continue;
+      labels.push(names[i]); data.push(weights[i]); colors.push(PIE_COLORS[k % PIE_COLORS.length]);
+      k++;
+    }
+    if (chartPie){ chartPie.destroy(); chartPie = null; }
+    chartPie = new Chart(canvasPie.getContext("2d"), {
+      type:"doughnut",
+      data:{ labels, datasets:[{ data, backgroundColor:colors, borderColor:"#06080b", borderWidth:2 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ position:"right", labels:{ color:"#e6ebf2", font:{ size:11 }, boxWidth:12, padding:8 } },
+          tooltip:{ callbacks:{ label:(c)=> `${c.label}: ${(c.parsed*100).toFixed(2)}%` } }
+        }
+      }
+    });
+  }
+
+  function renderMetrics(m){
+    const items = [
+      { label:"Rentabilidad anual", val: fmtPct(m.annual_return), cls: m.annual_return>=0?"pos":"neg" },
+      { label:"Max Drawdown",       val: fmtPct(m.max_drawdown),  cls:"neg" },
+      { label:"Volatilidad anual",  val: fmtPct(m.annual_volatility) },
+      { label:"Sharpe",   val: fmtNum(m.sharpe, 4), cls: m.sharpe>=0?"pos":"neg" },
+      { label:"Calmar",   val: fmtNum(m.calmar, 4), cls: m.calmar>=0?"pos":"neg" },
+      { label:"Alpha anual", val: fmtPct(m.alpha_annual, 2), cls: m.alpha_annual>=0?"pos":"neg" },
+      { label:"Beta vs S&P 500", val: fmtNum(m.beta, 4) },
+      { label:"VaR 95% diario", val: fmtPct(m.VaR_95), cls:"neg" },
+      { label:"VaR 99% diario", val: fmtPct(m.VaR_99), cls:"neg" },
+      { label:"Max DD (último año)", val: fmtPct(m.max_drawdown_ly), cls:"neg" },
+      { label:"Max Profit (último año)", val: fmtPct(m.max_profit_ly), cls:"pos" }
+    ];
+    let html = "";
+    for (const it of items){
+      html += `<div class="metric"><div class="metric-label">${it.label}</div>
+        <div class="metric-val ${it.cls||''}">${it.val}</div></div>`;
+    }
+    elMetricsGrid.innerHTML = html;
+  }
+
+  function renderEquity(days, equity, capital){
+    const pts = []; for (let t=0;t<equity.length;t++) pts.push({ x: days[t], y: equity[t]*capital });
+    if (chartEquity){ chartEquity.destroy(); chartEquity = null; }
+    chartEquity = new Chart(canvasEquity.getContext("2d"), {
+      type:"line",
+      data:{ datasets:[{ label:"Valor portafolio", data:pts, borderColor:"#00e58a",
+        backgroundColor:"rgba(0,229,138,.10)", borderWidth:1.8, pointRadius:0, fill:true, tension:0 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{
+            title:(items)=> items.length ? fmtISO(items[0].parsed.x) : '',
+            label:(c)=> `Valor: ${fmtUSD(c.parsed.y)}`
+          }}
+        },
+        scales:{
+          x:{ type:"time", time:{ unit:"year" },
+              ticks:{ color:"rgba(230,235,242,.45)", maxRotation:0, autoSkip:true, maxTicksLimit:10 },
+              grid:{ color:"rgba(255,255,255,.05)" } },
+          y:{ ticks:{ color:"rgba(230,235,242,.45)", callback:(v)=> "$"+v.toLocaleString("es-ES",{maximumFractionDigits:0}) },
+              grid:{ color:"rgba(255,255,255,.05)" } }
+        }
+      }
+    });
+  }
+
+  function renderDrawdown(days, dd){
+    const pts = []; for (let t=0;t<dd.length;t++) pts.push({ x: days[t], y: dd[t]*100 });
+    if (chartDD){ chartDD.destroy(); chartDD = null; }
+    chartDD = new Chart(canvasDD.getContext("2d"), {
+      type:"line",
+      data:{ datasets:[{ label:"Drawdown", data:pts, borderColor:"#ff3b4e",
+        backgroundColor:"rgba(255,59,78,.25)", borderWidth:1.2, pointRadius:0, fill:true, tension:0 }]},
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        plugins:{
+          legend:{ display:false },
+          tooltip:{ callbacks:{
+            title:(items)=> items.length ? fmtISO(items[0].parsed.x) : '',
+            label:(c)=> `Drawdown: ${c.parsed.y.toFixed(2)}%`
+          }}
+        },
+        scales:{
+          x:{ type:"time", time:{ unit:"year" },
+              ticks:{ color:"rgba(230,235,242,.45)", maxRotation:0, autoSkip:true, maxTicksLimit:10 },
+              grid:{ color:"rgba(255,255,255,.05)" } },
+          y:{ ticks:{ color:"rgba(230,235,242,.45)", callback:(v)=> v.toFixed(0)+"%" },
+              grid:{ color:"rgba(255,255,255,.05)" } }
+        }
+      }
+    });
+  }
+
+  function corrColor(r){
+    // -1 (rojo intenso) → 0 (gris) → 1 (azul intenso)
+    const a = Math.min(1, Math.abs(r));
+    if (r >= 0) return `rgba(61, 110, 245, ${0.10 + 0.70*a})`;
+    return `rgba(239, 68, 68, ${0.10 + 0.70*a})`;
+  }
+
+  function renderCorr(names, C){
+    const N = names.length;
+    let html = '<table class="corr-table"><thead><tr><th></th>';
+    for (const n of names) html += `<th>${n}</th>`;
+    html += '</tr></thead><tbody>';
+    for (let i=0;i<N;i++){
+      html += `<tr><td>${names[i]}</td>`;
+      for (let j=0;j<N;j++){
+        const r = C[i][j];
+        const bg = corrColor(r);
+        html += `<td style="background:${bg}">${r.toFixed(2)}</td>`;
+      }
+      html += '</tr>';
+    }
+    html += '</tbody></table>';
+    elCorrHost.innerHTML = html;
+  }
+
+  /* ============================================================
+     ORQUESTACIÓN
+     ============================================================ */
+  async function ejecutarOptimizacion(){
+    const selected = getSelectedAssets();
+    if (selected.length < 1){ setStatus("Selecciona al menos 1 activo.","error"); return; }
+
+    const soloActivo = selected.length === 1;
+    const perfil = selPerfil.value;
+    const capital = Math.max(100, parseFloat(inpCapital.value) || 10000);
+    const year = Math.max(1990, Math.min(2024, parseInt(inpYear.value,10) || 2000));
+
+    btnOpt.disabled = true;
+    elResults.classList.remove("show");
+    setStatus(`Descargando datos de ${selected.length} activo${selected.length > 1 ? "s" : ""} desde ${year}…`, "loading");
+
+    const fromISO = `${year}-01-01`;
+    const toISO   = new Date().toISOString().slice(0,10);
+
+    let seriesMap = {};
+    try {
+      const fetches = selected.map(a =>
+        fetchSeries(a.ticker, fromISO, toISO).then(s => { seriesMap[a.ticker] = s; })
+      );
+      await Promise.all(fetches);
+    } catch(err){
+      console.error(err);
+      setStatus("Error al descargar datos: " + err.message, "error");
+      btnOpt.disabled = false; return;
+    }
+
+    setStatus("Alineando series por fechas comunes…", "loading");
+    await new Promise(r=>setTimeout(r,15));
+
+    // S&P 500 para alpha/beta — añadirlo a aparte (no incluirlo en pesos)
+    const includeMarket = !selected.some(a => a.ticker === "^GSPC");
+    if (includeMarket){
+      try { seriesMap["__MARKET__^GSPC"] = await fetchSeries("^GSPC", fromISO, toISO); }
+      catch(e){ /* sin alpha/beta si falla */ }
+    }
+
+    // Alinear todo
+    const allTickers = Object.keys(seriesMap);
+    const aligned = alignSeries(seriesMap);
+    if (aligned.T < 60){
+      setStatus(`Datos comunes insuficientes (${aligned.T} días). Cambia activos o reduce el año.`, "error");
+      btnOpt.disabled = false; return;
+    }
+
+    // Reordenar para que los seleccionados queden primero (en orden) y el market al final
+    const selTickers  = selected.map(a => a.ticker);
+    const marketTicker = "__MARKET__^GSPC";
+    const hasMarket = aligned.tickers.includes(marketTicker);
+    const orderedTickers = [...selTickers];
+    if (hasMarket) orderedTickers.push(marketTicker);
+
+    // Construir nuevo prices flat con orden definido
+    const Nfull = orderedTickers.length;
+    const T = aligned.T;
+    const prices = new Float64Array(T * Nfull);
+    for (let n=0;n<Nfull;n++){
+      const srcIdx = aligned.tickers.indexOf(orderedTickers[n]);
+      for (let t=0;t<T;t++){
+        prices[t*Nfull + n] = aligned.prices[t*aligned.N + srcIdx];
+      }
+    }
+    const days = aligned.days.map(d => d * 86400000);
+
+    // Retornos diarios
+    const { R: Rfull, Tret } = toReturns(prices, T, Nfull);
+    const daysRet = days.slice(1); // alineado con Rfull
+
+    // Separar mercado del bloque de activos
+    const N = selTickers.length;
+    const R = new Float64Array(Tret * N);
+    for (let t=0;t<Tret;t++){
+      for (let n=0;n<N;n++) R[t*N + n] = Rfull[t*Nfull + n];
+    }
+    let marketReturns = null;
+    if (hasMarket){
+      marketReturns = new Float64Array(Tret);
+      for (let t=0;t<Tret;t++) marketReturns[t] = Rfull[t*Nfull + (Nfull-1)];
+    }
+    // Si S&P está entre los seleccionados, usarlo como mercado también
+    if (!marketReturns){
+      const gspcIdx = selTickers.indexOf("^GSPC");
+      if (gspcIdx >= 0){
+        marketReturns = new Float64Array(Tret);
+        for (let t=0;t<Tret;t++) marketReturns[t] = R[t*N + gspcIdx];
+      }
+    }
+
+    let w, elapsed = 0;
+    if (soloActivo) {
+      w = [1.0];
+      setStatus(`Calculando estadísticas de ${selected[0].name}…`, "loading");
+      await new Promise(r=>setTimeout(r,15));
+    } else {
+      setStatus(`Optimizando (perfil: ${perfil.toUpperCase()}) sobre ${N} activos y ${Tret} retornos…`, "loading");
+      await new Promise(r=>setTimeout(r,15));
+
+      // Score function
+      let scoreFn;
+      if (perfil === "sharpe")  scoreFn = (R,w,T,N,buf) => scoreSharpe(R,w,T,N,buf);
+      if (perfil === "calmar")  scoreFn = (R,w,T,N,buf) => scoreCalmar(R,w,T,N,buf);
+      if (perfil === "rvoldd")  scoreFn = (R,w,T,N,buf) => scoreRVolDD(R,w,T,N,buf);
+
+      // Calmar y R/(σ+DD) son menos suaves → más random starts
+      const optOpts = (perfil === "calmar" || perfil === "rvoldd")
+        ? { nRandom: 3000, topK: 30, hcIters: 400, sigma0: 0.10 }
+        : { nRandom: 2000, topK: 20, hcIters: 300, sigma0: 0.08 };
+
+      const t0 = performance.now();
+      const best = optimize(R, Tret, N, scoreFn, optOpts);
+      elapsed = (performance.now() - t0) / 1000;
+
+      w = Array.from(best.w);
+      let sum = w.reduce((a,b)=>a+b, 0);
+      w = w.map(v => v / sum);
+    }
+
+    // Métricas
+    const wArr = Float64Array.from(w);
+    const m = fullMetrics(R, wArr, Tret, N, daysRet, marketReturns);
+
+    // Render
+    const names = selected.map(a => a.name);
+    elResults.classList.add("show");
+
+    if (soloActivo) {
+      elResTitle.textContent = `Análisis individual · ${selected[0].name}`;
+      elResMeta.textContent  = `${fmtISO(days[0])} → ${fmtISO(days[T-1])} · ${Tret} retornos`;
+    } else {
+      const perfilLbl = perfil === "calmar" ? "Conservador (Calmar)"
+                      : perfil === "rvoldd" ? "Balanceado · R/(σ+DD)"
+                      : "Estándar (Sharpe)";
+      elResTitle.textContent = `Portafolio óptimo · ${perfilLbl}`;
+      elResMeta.textContent  = `${fmtISO(days[0])} → ${fmtISO(days[T-1])} · ${Tret} retornos · score: ${w.length > 0 ? "—" : ""} · ${elapsed.toFixed(1)}s`;
+    }
+    elCapiShown.textContent = fmtUSD(capital);
+
+    renderWeightsTable(names, w);
+    renderPie(names, w);
+    renderMetrics(m);
+    renderEquity(daysRet, m.equity, capital);
+    renderDrawdown(daysRet, m.dd);
+
+    // Correlación: solo con 2+ activos
+    const corrEl = document.getElementById("corr-section");
+    if (!soloActivo) {
+      if (corrEl) corrEl.style.display = "";
+      const C = corrMatrix(R, Tret, N);
+      renderCorr(names, C);
+    } else {
+      if (corrEl) corrEl.style.display = "none";
+    }
+
+    if (soloActivo) {
+      setStatus(`Listo · ${selected[0].name} · ${Tret} días de datos.`);
+    } else {
+      setStatus(`Listo. Optimizado en ${elapsed.toFixed(1)} s.`);
+    }
+    btnOpt.disabled = false;
+  }
+
+  renderCatalog();
+  btnOpt.addEventListener("click", ejecutarOptimizacion);
+
+  /* ============================================================
+     DESCARGA PDF
+     ============================================================ */
+  const btnPdf = document.getElementById("btn-pdf");
+  btnPdf.addEventListener("click", async () => {
+    // html2canvas + jsPDF cargadas por separado
+    const h2c  = window.html2canvas;
+    const JsPDF = (window.jspdf && window.jspdf.jsPDF) || window.jsPDF;
+    if (!h2c || !JsPDF){
+      setStatus("Librería PDF no cargada. Recarga la página.", "error");
+      return;
+    }
+
+    const target = document.getElementById("results");
+    if (!target || !target.classList.contains("show")){
+      setStatus("Ejecuta una optimización antes de descargar el PDF.", "error");
+      return;
+    }
+
+    const titulo = elResTitle.textContent || "Resultado portafolio";
+    const safe = titulo.replace(/[^\w\-_.]+/g, "_").slice(0, 60);
+    const fecha = new Date().toISOString().slice(0,10);
+    const filename = `portafolio_${safe}_${fecha}.pdf`;
+
+    btnPdf.disabled = true;
+    const originalLabel = btnPdf.innerHTML;
+    btnPdf.textContent = "Generando…";
+    document.body.classList.add("pdf-rendering");
+
+    // Forzar resize de charts para que tengan dimensiones correctas
+    try { Object.values(Chart.instances || {}).forEach(c => c && c.resize && c.resize()); } catch(e){}
+    await new Promise(r=>setTimeout(r,250));
+
+    try {
+      const pdf = new JsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+      const pageW = pdf.internal.pageSize.getWidth();   // 297mm
+      const pageH = pdf.internal.pageSize.getHeight();  // 210mm
+      const margin = 6;
+
+      const drawBg = () => {
+        pdf.setFillColor(13, 17, 23);
+        pdf.rect(0, 0, pageW, pageH, 'F');
+      };
+
+      // Identificar paneles del resultado
+      const panels = Array.from(target.querySelectorAll(":scope > .pf-panel"));
+      const head    = target.querySelector(".pf-results-head");
+      const grid2   = target.querySelector(":scope > .pf-grid-2");
+      const metrics = panels[0];                                        // Métricas
+      const equity  = panels[1];                                        // Evolución
+      const drawdwn = panels[2];                                        // Drawdown
+      const corr    = document.getElementById("corr-section");
+
+      // Definición de cada página
+      const pages = [
+        [head, grid2, metrics].filter(Boolean),     // Pág 1: header + pesos/distribución + métricas
+        [equity, drawdwn].filter(Boolean),          // Pág 2: evolución + drawdown
+      ];
+      if (corr && corr.style.display !== "none") {
+        pages.push([corr]);                          // Pág 3: correlación (solo si existe)
+      }
+
+      const captureOpts = {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#06080b',
+        logging: false,
+        ignoreElements: (el) => {
+          if (el.tagName === 'CANVAS' && (el.width === 0 || el.height === 0)) return true;
+          return false;
+        }
+      };
+
+      for (let p = 0; p < pages.length; p++){
+        const elements = pages[p];
+        if (!elements.length) continue;
+
+        if (p > 0) pdf.addPage();
+        drawBg();
+
+        // Capturar cada panel individualmente
+        const captured = [];
+        for (const el of elements){
+          const c = await h2c(el, captureOpts);
+          captured.push(c);
+        }
+
+        const availW = pageW - margin * 2;
+        const availH = pageH - margin * 2;
+        const gap    = 3; // mm entre paneles dentro de la misma página
+
+        // Altura total si todos ocupan el ancho completo
+        let totalH = 0;
+        for (const c of captured) totalH += (c.height / c.width) * availW;
+        totalH += gap * (captured.length - 1);
+
+        // Si no cabe en la página, escalamos proporcionalmente
+        const scale = totalH > availH ? availH / totalH : 1;
+
+        let yPos = margin + (totalH * scale < availH ? (availH - totalH * scale) / 2 : 0);
+        for (const c of captured){
+          const w = availW * scale;
+          const h = (c.height / c.width) * w;
+          const xPos = (pageW - w) / 2;
+          pdf.addImage(c.toDataURL('image/jpeg', 0.92), 'JPEG', xPos, yPos, w, h, undefined, 'FAST');
+          yPos += h + gap * scale;
+        }
+      }
+
+      pdf.save(filename);
+
+    } catch(err){
+      console.error(err);
+      setStatus("Error generando PDF: " + err.message, "error");
+    } finally {
+      document.body.classList.remove("pdf-rendering");
+      btnPdf.disabled = false;
+      btnPdf.innerHTML = originalLabel;
+    }
+  });
+})();
+</script>
+<script>
+/* UTC session clock in the nav bar */
+(function(){
+  var out = document.getElementById("qtt-clock-val");
+  if (!out) return;
+  function tick(){
+    out.textContent = new Date().toISOString().slice(11, 19);
+  }
+  tick();
+  setInterval(tick, 1000);
+})();
+</script>
+
+</body>
+</html>
